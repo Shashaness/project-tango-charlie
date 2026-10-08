@@ -1,0 +1,51 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Build directories
+build/
+bin/
+obj/
+out/
+dist/
+
+# C/C++ build artifacts
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Logs / temporary files
+*.log
+*.tmp
+*.swp
+*~
+
+# Runtime/generated data
+cache/
+tmp/
+
+# Python, if we use tooling scripts
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Secrets / local configuration
+.env
+.env.*
+secrets/
