@@ -46,6 +46,8 @@ class GroundContact:
     friction_force: np.ndarray = field(default_factory=lambda:np.zeros(3))
     reaction_force: np.ndarray = field(default_factory=lambda:np.zeros(3))
     desired_velocity: np.ndarray = field(default_factory=lambda:np.zeros(3))
+    touchdown_id: int = 0
+    touchdown_impact_speed: float = 0.0
     impact_speed: float = 0.0
     hard_landing_time: float = 0.0
     walk_phase: float = 0.0

@@ -1,4 +1,4 @@
-## Project Tango Charlie
+# Project Tango Charlie
 
 Project Tango Charlie is an experimental cross-platform Python/OpenGL 6DOF
 combat-flight and transformable-vehicle simulator, being prepared for open-source

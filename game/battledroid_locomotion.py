@@ -34,7 +34,7 @@ class BattledroidLocomotionAnimator:
     """Owns only animation state and model deltas, never vehicle integration."""
     def __init__(self,transformation,enabled=True):
         self.transformation=transformation;self.model=transformation.model
-        self.enabled=enabled;self.state='IDLE';self.gait_phase=0.;self.blend=0.
+        self.gait_allowed=True;self.enabled=enabled;self.state='IDLE';self.gait_phase=0.;self.blend=0.
         self.forward_speed=self.lateral_speed=self.cadence=0.
         self.offsets={};self.joint_angles={};self._fading_angles={}
         self._was_transforming=False
@@ -59,7 +59,7 @@ class BattledroidLocomotionAnimator:
         speed=float(np.linalg.norm(horizontal))
         self.forward_speed=float(np.dot(horizontal,forward))
         self.lateral_speed=float(np.dot(horizontal,right))
-        eligible=(self.enabled and not c.active and c.configuration is VehicleMode.BATTLEDROID
+        eligible=(self.enabled and self.gait_allowed and not c.active and c.configuration is VehicleMode.BATTLEDROID
                   and vehicle.flight_state.mode is VehicleMode.BATTLEDROID
                   and vehicle.flight_state.environment is Environment.ATMOSPHERE
                   and vehicle.flight_state.status is FlightStatus.GROUNDED)

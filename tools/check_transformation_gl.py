@@ -27,6 +27,7 @@ def capture(path):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path)
     parser.add_argument('--locomotion',action='store_true')
+    parser.add_argument('--animation',action='store_true')
     parser.add_argument('--vtol-ground',action='store_true');args=parser.parse_args()
     if args.output:args.output.mkdir(parents=True,exist_ok=True)
     window=None;renderer=None
@@ -101,6 +102,24 @@ def main():
                 c.cycle()
                 for sample in range(12):
                     game.update(.15);draw('GAIT_TRANSFORM_'+str(sample))
+            if args.animation:
+                from engine.input import Input
+                from game.flight_state import FlightStatus
+                for label, impact in (('GENTLE', 2.), ('HARD', 16.)):
+                    game.input = Input();game.setup_battledroid_test('ground')
+                    v.position[1] = 3.5;v.velocity[1] = -impact
+                    v.flight_state.status = FlightStatus.FLYING
+                    game.camera.reset_orbit();game.camera.follow(v, 0)
+                    game.camera.orbit_drag(360, 0);game.camera.orbit_zoom(-4)
+                    game.camera.follow(v, 1)
+                    seen = set()
+                    for sample in range(240):
+                        game.update(1/120)
+                        seen.add(v.animation.state)
+                        if sample in (0, 8, 16, 28, 48, 80, 120, 239):
+                            draw('ANIMATION_'+label+'_'+str(sample))
+                    if not {'AIRBORNE', 'LANDING', 'RECOVERY', 'IDLE'} <= seen:
+                        raise RuntimeError('Missing landing animation states: '+str(seen))
             if args.vtol_ground:
                 from game.flight_state import FlightStatus
                 from engine.input import Input

@@ -68,6 +68,14 @@ class ModelNode:
         """Local visual layer after the current configuration pose; no rest writes."""
         self._delta=np.eye(4) if matrix is None else checked_matrix(matrix)
 
+    def compose_animation_delta(self, matrix):
+        """Append a local visual layer to the freshly evaluated animation pose."""
+        self._delta = self._delta @ checked_matrix(matrix)
+
+    @property
+    def configuration_matrix(self):
+        return (self._base if self._override is None else self._override).copy()
+
     def reset_pose(self):
         self._override=None;self._delta=np.eye(4)
 

@@ -21,6 +21,7 @@ from engine.renderer import Renderer
 from game.identity import PROJECT_TITLE, PLAYER_UNIT_DESIGNATION
 from game.transformation import TransformationController
 from game.battledroid_locomotion import BattledroidLocomotionAnimator
+from game.battledroid_animation import BattledroidAnimationController
 
 
 class Game:
@@ -36,6 +37,7 @@ class Game:
         self.player_vehicle.transformation = TransformationController(self.player_vehicle)
         self.player_vehicle.locomotion = BattledroidLocomotionAnimator(
             self.player_vehicle.transformation, enabled=locomotion_animation)
+        self.player_vehicle.animation = BattledroidAnimationController(self.player_vehicle.locomotion)
         self.player_vehicle.defenses = CountermeasureDispenser()
         self.player_vehicle.avionics = DefensiveAvionics()
         self.world.player_target = PlayerTarget(self.player_vehicle)
@@ -230,12 +232,15 @@ class Game:
             for substep in range(steps):
                 previous_position = self.player_vehicle.position.copy()
                 previous_velocity = self.player_vehicle.velocity.copy()
+                self.player_vehicle.animation.clear_layer()
                 self.player_vehicle.locomotion.clear_layer()
                 self.player_vehicle.transformation.update(step)
                 if not self.flight_controller.fcc.hover_eligible(self.player_vehicle):
                     self.flight_controller.fcc.clear_hover()
                 self.flight_controller.update(step, self.input)
+                self.player_vehicle.animation.prepare(step, self.player_vehicle, self.input)
                 self.player_vehicle.locomotion.update(step, self.player_vehicle, self.input)
+                self.player_vehicle.animation.update()
                 target_starts = {target: target.position.copy() for target in self.world.targets}
                 candidate_starts = {c:c.position.copy() for c in self.world.countermeasures}
                 for package in self.world.countermeasures: package.update(step)
@@ -265,7 +270,10 @@ class Game:
                         enemy.pilot.missile_launched()
         else:
             self.flight_controller.update(dt, self.input)
+            self.player_vehicle.animation.clear_layer()
+            self.player_vehicle.animation.prepare(max(0.,dt), self.player_vehicle, self.input)
             self.player_vehicle.locomotion.update(max(0.,dt), self.player_vehicle, self.input)
+            self.player_vehicle.animation.update()
             self.combat.radar.update(self.player_vehicle,self.world.targets,self.combat.gun)
         self.player_vehicle.avionics.update(self.player_vehicle,self.world.player_target,
             self.world.enemies,[m for e in self.world.enemies for m in e.combat.missiles])

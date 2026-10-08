@@ -155,6 +155,9 @@ def instrument_groups(vehicle, fcc=None, debug=False):
                            f'FRICTION {np.linalg.norm(g.friction_force)/1000:.1f} KN'))
         animator=getattr(vehicle,'locomotion',None)
         if battledroid and animator is not None:
+            animation = getattr(vehicle, 'animation', None)
+            if animation is not None:
+                detail.append(f'STATE {animation.state} IMPACT {animation.severity:.2f}')
             detail.extend((f'LOC {animator.state}',
                            f'FWD {animator.forward_speed:+.1f} LAT {animator.lateral_speed:+.1f}',
                            f'GAIT {animator.gait_phase:.2f} CAD {animator.cadence:.2f}',

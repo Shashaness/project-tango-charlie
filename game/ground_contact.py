@@ -16,6 +16,9 @@ def resolve_contact(vehicle,clearance,*,supported,safe_speed,crash_speed,safe_ti
             v.velocity[1]=0. # normal collision impulse only
             tilt=math.degrees(math.acos(float(np.clip(v.up[1],-1,1))))
             if not supported:
+                if v.flight_state.status is FlightStatus.FLYING:
+                    ground.touchdown_id += 1
+                    ground.touchdown_impact_speed = impact
                 ground.impact_speed=impact
                 if impact>safe_speed or tilt>safe_tilt:
                     ground.hard_landing_time=5. if impact>=hard_speed else 3.
