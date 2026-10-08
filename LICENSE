@@ -2,21 +2,6 @@ MIT License
 
 Copyright (c) 2026 Shawn Bakhtiar
 
-Unless otherwise noted, this license applies to the entire repository, including:
-
-- Source code and scripts
-- 3D models and GLB assets
-- Textures, materials, and shaders
-- Original sound effects and music
-- Documentation and other original project assets
-
-Third-party dependencies and assets retain their respective licenses. 
-Only materials owned by the project or appropriately licensed for 
-redistribution are included under the project's MIT License.
-
-You are free to use, modify, distribute, and commercially exploit 
-these materials under the terms of the MIT License.
-
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights

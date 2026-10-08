@@ -1,4 +1,4 @@
-# Project Tango Charlie
+## Project Tango Charlie
 
 Project Tango Charlie is an experimental cross-platform Python/OpenGL 6DOF
 combat-flight and transformable-vehicle simulator, being prepared for open-source
@@ -9,6 +9,27 @@ battledroid, **TC167**, associated with **Tango Charlie**. The pilot's gender is
 unspecified. TC167 has three configurations: **FIGHTER** (high-speed aircraft),
 **VTOL** (vertical-takeoff/hover), and **BATTLEDROID** (humanoid combat).
 See [the premise](docs/premise.md). No additional dependencies are required.
+
+## License
+
+Project Tango Charlie is released under the **MIT License**.
+
+Copyright (c) 2026 Shawn Bakhtiar.
+
+Unless otherwise noted, this license applies to the entire repository, including:
+
+- Source code and scripts
+- 3D models and GLB assets
+- Textures, materials, and shaders
+- Original sound effects and music
+- Documentation and other original project assets
+
+You are free to use, modify, distribute, and commercially exploit these materials under the terms of the MIT License.
+
+See [LICENSE](LICENSE) for the complete license text.
+
+Third-party dependencies and assets retain their respective licenses. Only materials owned by the project or appropriately licensed for redistribution are included under the project's MIT License.
+
 
 ## Run
 
