@@ -1505,9 +1505,10 @@ bank continuously. **0** toggles CHASE/DOLLY once per key press. DOLLY starts
 from the current chase offset, follows vehicle position and preserves its
 observation angle independently of vehicle rotation.
 
-Mouse/trackpad click-drag and scroll operate only in DOLLY. **C** switches
+Mouse/trackpad click-drag operates in DOLLY. Mouse-wheel/trackpad scroll zooms
+in both CHASE and DOLLY: scroll up moves closer and scroll down moves farther. **C** switches
 external/cockpit, preserving the selected external mode. **HOME / Fn+Left /
-BACKSPACE** resets DOLLY angle/zoom while remaining in DOLLY. Returning to CHASE
+BACKSPACE** restores the current profile's default angle/zoom without changing the external mode. Returning to CHASE
 requires only **0**. The title shows CHASE, DOLLY or COCKPIT.
 
 Camera correction validation: **257 tests pass**, including key hold/release
@@ -1551,3 +1552,46 @@ M20.3 terrain accepts local SRTM HGT and WGS84 GeoTIFF elevation tiles from
 project-root `hgt/`, with bounded raster caching and quadtree LOD.
 See [TERRAIN_LOD.md](docs/TERRAIN_LOD.md) for installation, geographic configuration,
 H diagnostics, synthetic validation, and the deferred terrain collision limitation.
+
+M20.5 streams geographic terrain beyond the former boundary, using real local
+elevation where available and seeded procedural relief elsewhere. See
+[Planetary world](docs/PLANETARY_WORLD.md) for registry conventions, bounded caches,
+coordinate limits, diagnostics, and validation.
+
+
+### Chase camera profiles
+
+`Camera(chase_settings={VehicleMode.BATTLEDROID: ChaseSettings(32,12,18,100)})`
+accepts per-mode overrides; defaults are in `engine/camera.py`:
+
+| Mode | Rear distance | Elevation | Zoom radius limits |
+| --- | ---: | ---: | ---: |
+| FIGHTER | 24 m | 7 m | 8–80 m |
+| VTOL | 18 m | 6 m | 8–70 m |
+| BATTLEDROID | 32 m | 12 m | 18–100 m |
+
+Distance and elevation describe the default offset. Zoom limits constrain total
+camera radius; CHASE zoom preserves the profile's elevation angle. Each mode
+remembers its user-adjusted radius across transformations and cockpit/external
+switches. The camera begins transitioning toward an active transformation's target
+profile, including on reversal, without changing physics mode or animation state.
+CHASE follows vehicle orientation; DOLLY retains world-relative orbit azimuth
+while adjusting toward the new profile's elevation and remembered radius.
+Existing exponential smoothing (8/s) applies to zoom and profile transitions.
+The wider robot view exposes the whole model and nearby terrain. Home/Backspace
+resets the current profile; development reset/teleport snapping remains supported.
+
+The pre-existing camera has no terrain or building collision avoidance; neither
+height queries nor building bounds were previously consulted by the camera.
+This focused refinement does not add collision/raycast infrastructure. Extreme
+orbits can still intersect geometry, especially below the ground or near walls.
+Aircraft controls, physics, locomotion, transformation, and HUD are unchanged.
+
+
+Camera refinement validation: all 20 camera tests and eight prototype tests pass.
+The complete suite ran 359 tests: 357 passed with the same two pre-existing
+imported-model failures (folded-wing extent and negative node scales). GLFW
+callback direction, limits, per-mode persistence, target/reversal transitions,
+frame-rate-independent smoothing, cockpit restoration and physics/model isolation
+are covered. The OpenGL checker validates three upload/animation/ground/cleanup
+cycles; captures are in `/tmp/chase-gl-final` for manual robot framing inspection.

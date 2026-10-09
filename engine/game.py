@@ -33,6 +33,7 @@ class Game:
         self.world = World(enemy_count, ai_parameters, terrain_config)
         self.combat = CombatSystem()
         self.player_vehicle = PlayerVehicle()
+        self.player_vehicle.geographic_frame = self.world.terrain.frame
         self.player_vehicle.unit_designation = PLAYER_UNIT_DESIGNATION
         self.player_vehicle.transformation = TransformationController(self.player_vehicle)
         self.player_vehicle.locomotion = BattledroidLocomotionAnimator(

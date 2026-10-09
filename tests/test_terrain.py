@@ -142,17 +142,19 @@ class TerrainTests(unittest.TestCase):
         selector = TerrainSelector(terrain)
         self.assertGreater(len(selector.select((0,30000,0))),1)
         self.assertGreater(len(selector.select((0,44000,0))),1)
-        self.assertEqual(TerrainSelector(terrain).select((0,44000,0)),[(0,0,0)])
-        self.assertEqual(selector.select((0,51000,0)),[(0,0,0)])
+        self.assertTrue(all(k[0]==0 for k in TerrainSelector(terrain).select((0,44000,0))))
+        self.assertTrue(all(k[0]==0 for k in selector.select((0,51000,0))))
         terrain.dataset.close()
 
     def test_no_data_and_partial_tile_fallback(self):
         empty=Terrain(replace(self.terrain.config,directory=self.directory/'missing'))
-        self.assertFalse(empty.enabled); self.assertEqual(empty.height_at(13000,12000),0)
-        np.testing.assert_array_equal(empty.normal_at(13000,12000),(0,1,0))
-        self.assertEqual(self.terrain.height_at(100000,100000),0)
+        self.assertTrue(empty.enabled)
+        lat,lon=empty.projection.to_geographic(13000,12000)
+        self.assertAlmostEqual(empty.height_at(13000,12000),float(empty.provider.procedural.sample(lat,lon))-empty.offset)
+        self.assertAlmostEqual(np.linalg.norm(empty.normal_at(13000,12000)),1)
+        self.assertTrue(np.isfinite(self.terrain.height_at(100000,100000)))
         x,z=self.terrain.projection.to_world(34.5,-112)
-        self.assertEqual(self.terrain.height_at(x,z),0)
+        self.assertAlmostEqual(self.terrain.height_at(x,z),float(self.terrain.provider.procedural.sample(34.5,-112))-self.terrain.offset)
         empty.dataset.close()
 
     def test_async_cache_reuse_and_cleanup(self):

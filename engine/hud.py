@@ -15,6 +15,7 @@ from game.flight_instruments import heading_degrees, vertical_speed, normal_g_lo
 
 MIN_MARKER_SPEED = 0.05
 HUD_COLOR = (0.3, 1.0, 0.55)
+PROCEDURAL_COLOR = (1.0, 0.55, 0.1)
 VELOCITY_COLOR = (1.0, 0.8, 0.2)
 # Tiny 3x5 debug font: only instrumentation labels, numbers and punctuation.
 FONT = dict(zip(
@@ -38,7 +39,19 @@ FONT = dict(zip(
 
 FONT["/"] = "001/001/010/100/100"
 FONT["+"] = "000/010/111/010/000"
+FONT[":"] = "000/010/000/010/000"
 FONT[">"] = "100/010/001/010/100"
+FONT["°"] = "110/110/000/000/000"
+
+
+def compass_ticks(heading, half_span=50):
+    """Unwrapped offsets keep the tape continuous through geographic north."""
+    cardinals = {0:'N', 90:'E', 180:'S', 270:'W'}
+    for angle in range(math.ceil((heading-half_span)/10)*10,
+                       math.floor((heading+half_span)/10)*10+1, 10):
+        normalized = angle % 360
+        label = cardinals.get(normalized, f'{normalized:03d}') if angle % 30 == 0 else None
+        yield angle-heading, label
 
 
 def project_direction(direction, camera, width, height):
@@ -173,6 +186,7 @@ class HUD:
     def __init__(self):
         self.width, self.height = 1280, 720
         self.terrain_debug = None
+        self.geographic_mapped = False
         self.mesh = None
 
     def initialize(self):
@@ -237,9 +251,38 @@ class HUD:
                             triangle((px,py), (px+scale,py+scale), (px,py+scale), color)
 
         groups = instrument_groups(vehicle, fcc, debug)
+        heading = heading_degrees(vehicle)
+        center = self.width/2
+        tape_width = min(self.width*.30, 100*scale)
+        tape_y = self.height-13*scale
+        # Direct orientation sampling needs no additional lag/smoothing state.
+        if heading is not None:
+            label = f'{int(math.floor(heading+.5)) % 360:03d}°'
+            text(label, center-len(label)*2*scale, self.height-12)
+            for offset, label in compass_ticks(heading):
+                x = center+offset*tape_width/100
+                line((x,tape_y), (x,tape_y+(3 if label else 1.5)*scale))
+                if label is not None and abs(offset)+len(label)*2*scale*100/tape_width <= 50:
+                    text(label, x-len(label)*2*scale, tape_y-2*scale)
+        else:
+            text('---°', center-8*scale, self.height-12)
+        line((center-2*scale,tape_y+5*scale), (center,tape_y+3*scale))
+        line((center+2*scale,tape_y+5*scale), (center,tape_y+3*scale))
+        geographic = vehicle.geographic_position
+        if geographic is not None:
+            color = HUD_COLOR if self.geographic_mapped else PROCEDURAL_COLOR
+            for row, label in enumerate((f"LAT {geographic.latitude:.4f}",
+                                         f"LON {geographic.longitude:.4f}")):
+                text(label, (self.width-len(label)*4*scale)/2,
+                     self.height-(24+row*8)*scale, color)
         if debug and self.terrain_debug is not None:
             t = self.terrain_debug
-            groups['debug'].extend([f"TERRAIN LOD {t['lod']} PATCH {t['patches']}", f"TRI {t['triangles']} AGL {t['agl']:.0f} TILES {t['tiles']}"])
+            groups['debug'].extend([f"TERRAIN LOD {t['lod']} PATCH {t['patches']}", f"TRI {t['triangles']} AGL {t['agl']:.0f}{' EST' if t.get('agl_estimated') else ''} TILES {t['tiles']}"])
+            if 'latitude' in t:
+                groups['debug'].extend([f"GEO {t['latitude']:.4f} {t['longitude']:.4f} {t['tile']}",
+                    f"SRC {t['source']} CPU {t['cpu_cached']} GPU {t['cached']} Q {t['pending']}",
+                    'LOD '+ ' '.join(f"{level}:{count}" for level,count in sorted(t['lod_distribution'].items())),
+                    f"CACHE CPU {t['cpu_bytes']/1048576:.1f}M GPU {t['gpu_bytes']/1048576:.1f}M WARN {t['warnings']}"])
         for row, label in enumerate(groups['left']):
             text(label, 12, self.height-12-row*8*scale)
         for row, label in enumerate(groups['right']):

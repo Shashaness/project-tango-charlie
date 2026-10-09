@@ -1,6 +1,7 @@
 """Project Tango Charlie entry point and reproducible AI test presets."""
 import argparse
 from dataclasses import replace
+from pathlib import Path
 from engine.game import Game
 from game.identity import PROJECT_TITLE
 from game.ai_config import AI, AI_ENEMY_COUNT
@@ -24,6 +25,9 @@ def main():
     parser.add_argument('--defense-range', type=float, default=1000., help='preset launch distance, 250-3500 meters')
     parser.add_argument('--ai-ecm', action='store_true', help='enable ECM on alternating enemies')
     parser.add_argument('--terrain-dir', help='directory of user-supplied HGT or WGS84 GeoTIFF elevation tiles')
+    parser.add_argument('--planet-tiles',type=Path,help='geographic asset registry directory')
+    parser.add_argument('--planet-seed',type=int,default=205)
+    parser.add_argument('--terrain-patch-span',type=float,default=32000.,help='coarse streaming root span in meters')
     parser.add_argument('--terrain-origin', nargs=2, type=float, metavar=('LAT', 'LON'), default=(34.5,-111.5))
     parser.add_argument('--terrain-offset', type=float, help='source EGM96 elevation assigned to world Y=0')
     parser.add_argument('--terrain-budget', type=int, default=64)
@@ -43,9 +47,9 @@ def main():
     parameters = replace(AI, guns_enabled=args.ai_weapons != 'none',
                          missiles_enabled=args.ai_weapons == 'all',ecm_enabled=args.ai_ecm)
     from game.terrain import TerrainConfig
-    from pathlib import Path
     try:
-        terrain_config = TerrainConfig(latitude=args.terrain_origin[0], longitude=args.terrain_origin[1],
+        terrain_config = TerrainConfig(planetary_seed=args.planet_seed,side=args.terrain_patch_span,
+            **({'registry_directory':args.planet_tiles} if args.planet_tiles else {}),latitude=args.terrain_origin[0], longitude=args.terrain_origin[1],
             elevation_offset=args.terrain_offset, budget=args.terrain_budget,
             cache_size=max(96,args.terrain_budget+1), view_distance=args.terrain_view_distance,
             **({'directory': Path(args.terrain_dir)} if args.terrain_dir else {}))

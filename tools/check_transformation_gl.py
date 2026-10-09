@@ -34,11 +34,12 @@ def main():
     parser.add_argument('--terrain-test',action='store_true',help='render locally generated synthetic elevation terrain')
     parser.add_argument('--terrain-test-format',choices=('hgt','geotiff'),default='hgt')
     parser.add_argument('--terrain-dir',type=Path,help='validate installed local HGT/GeoTIFF terrain')
+    parser.add_argument('--planetary-streaming',action='store_true',help='exercise remote geographic cells and delayed root fallback')
     parser.add_argument('--vtol-ground',action='store_true');args=parser.parse_args()
     if args.output:args.output.mkdir(parents=True,exist_ok=True)
     window=None;renderer=None;terrain_fixture=None;terrain_config=None
     if args.terrain_test and args.terrain_dir:parser.error('--terrain-test and --terrain-dir are mutually exclusive')
-    terrain_requested=args.terrain_test or args.terrain_dir is not None
+    terrain_requested=args.terrain_test or args.terrain_dir is not None or args.planetary_streaming
     if terrain_requested:
         from game.terrain import TerrainConfig
     if args.terrain_dir is not None:
@@ -109,6 +110,29 @@ def main():
                 game.camera.up[:]=(0,0,-1)
                 draw('WORLD_CITY_PLAN')
                 game.reset_runway()
+            if args.planetary_streaming:
+                from game.flight_state import Environment
+                v.flight_state.environment=Environment.ATMOSPHERE
+                game.camera.mode='COCKPIT';renderer.show_axes=True
+                for index,position in enumerate(((45000,1800,0),(140000,1800,-90000),(240000,1800,100000),(-160000,1800,40000))):
+                    v.position[:]=position;v.velocity[:]=(350,0,-50)
+                    game.camera.position[:]=position
+                    forward=np.array([0.,-.2,-1]);forward/=np.linalg.norm(forward)
+                    game.camera.forward[:]=forward;game.camera.right[:]=(1,0,0)
+                    game.camera.up[:]=np.cross(game.camera.right,forward)
+                    draw('STREAM_IMMEDIATE_'+str(index))
+                    if not renderer.terrain_resources.active:raise RuntimeError('Streaming left no visible coverage')
+                    deadline=time.monotonic()+5
+                    while time.monotonic()<deadline:
+                        renderer.render()
+                        if not renderer.terrain_resources.pending:break
+                        time.sleep(.01)
+                    draw('STREAM_READY_'+str(index))
+                    stats=renderer.terrain_resources.stats
+                    if stats['patches']>game.world.terrain.config.budget or stats['cached']>game.world.terrain.config.cache_size:raise RuntimeError('Streaming budget exceeded')
+                    if iteration==0:print('STREAM',index,stats)
+                handles.extend((m.vao,m.vbo,m.ebo) for m in renderer.terrain_resources.cache.values())
+                renderer.show_axes=False;game.reset_runway()
             if terrain_requested:
                 if renderer.terrain_resources is None:raise RuntimeError("No supported elevation rasters found")
                 from game.flight_state import Environment

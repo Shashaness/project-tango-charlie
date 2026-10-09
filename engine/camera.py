@@ -1,6 +1,7 @@
 """Vehicle-observing perspective camera, independent of flight physics."""
 
 import math
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -18,21 +19,44 @@ ORBIT_ZOOM_RATE = .12  # exponential distance change per scroll unit
 
 CHASE_SMOOTHING = 8.0  # exponential position response / second
 
+@dataclass(frozen=True)
+class ChaseSettings:
+    distance: float
+    elevation: float
+    minimum: float
+    maximum: float
+
+    def __post_init__(self):
+        if not all(math.isfinite(v) for v in (self.distance,self.elevation,self.minimum,self.maximum)) or not (
+                self.distance>0 and self.elevation>=0 and 0<self.minimum<=math.hypot(self.distance,self.elevation)<=self.maximum):
+            raise ValueError('Invalid chase camera settings')
+
+CHASE_SETTINGS = {
+    VehicleMode.FIGHTER: ChaseSettings(24.,7.,8.,80.),
+    VehicleMode.VTOL: ChaseSettings(18.,6.,8.,70.),
+    VehicleMode.BATTLEDROID: ChaseSettings(32.,12.,18.,100.),
+}
+
 
 class Camera(Transform):
-    def __init__(self, position=(0, 0, 3), aspect=1280 / 720):
+    def __init__(self, position=(0, 0, 3), aspect=1280 / 720, chase_settings=None):
         super().__init__(position)
         self.aspect = aspect
         self.fov = np.radians(60.0)
         self.near = 0.1
         self.far = 20000.0
         self.mode = "CHASE"
+        self.chase_settings = dict(CHASE_SETTINGS)
+        if chase_settings is not None:self.chase_settings.update(chase_settings)
+        self._vehicle_mode = VehicleMode.FIGHTER
+        self._zoom = {mode:math.hypot(s.distance,s.elevation) for mode,s in self.chase_settings.items()}
         self.external_camera_mode = "CHASE"
-        self._external_offset = np.array((0., CHASE_HEIGHT, CHASE_DISTANCE))
+        initial = self.chase_settings[VehicleMode.FIGHTER]
+        self._external_offset = np.array((0., initial.elevation, initial.distance))
         self._snap = True
         self.orbit_yaw = 0.0
-        self.orbit_pitch = math.atan2(CHASE_HEIGHT, CHASE_DISTANCE)
-        self.orbit_distance = math.hypot(CHASE_DISTANCE, CHASE_HEIGHT)
+        self.orbit_pitch = math.atan2(initial.elevation, initial.distance)
+        self.orbit_distance = math.hypot(initial.distance, initial.elevation)
         self._manual_orbit = False
         self._orbit_basis = np.eye(3)
         self._default_basis = np.eye(3)
@@ -76,10 +100,12 @@ class Camera(Transform):
                                          -ORBIT_PITCH_LIMIT, ORBIT_PITCH_LIMIT))
 
     def orbit_zoom(self, scroll):
-        if self.mode != "CHASE" or self.external_camera_mode != "DOLLY" or not math.isfinite(scroll) or scroll == 0:return
+        if self.mode != "CHASE" or not math.isfinite(scroll) or scroll == 0:return
         factor = math.exp(float(np.clip(-scroll * ORBIT_ZOOM_RATE, -20, 20)))
+        settings = self.chase_settings[self._vehicle_mode]
         self.orbit_distance = float(np.clip(self.orbit_distance * factor,
-                                            ORBIT_MIN_DISTANCE, ORBIT_MAX_DISTANCE))
+                                            settings.minimum, settings.maximum))
+        self._zoom[self._vehicle_mode] = self.orbit_distance
 
     def reset_orbit(self):
         self._manual_orbit = self.external_camera_mode == "DOLLY"
@@ -87,6 +113,7 @@ class Camera(Transform):
         self.orbit_yaw = 0.0
         self.orbit_pitch = self._default_pitch
         self.orbit_distance = self._default_distance
+        self._zoom[self._vehicle_mode] = self._default_distance
         self._snap = True
 
     def snap_to_vehicle(self):
@@ -98,20 +125,29 @@ class Camera(Transform):
         self._snap = True
 
     def follow(self, vehicle, dt):
+        mode = vehicle.flight_state.mode
+        transformation = getattr(vehicle, 'transformation', None)
+        if getattr(transformation, 'active', False):mode = transformation.target
+        settings = self.chase_settings[mode]
+        mode_changed = mode is not self._vehicle_mode
+        self._vehicle_mode = mode
+        self._default_pitch = math.atan2(settings.elevation, settings.distance)
+        self._default_distance = math.hypot(settings.distance, settings.elevation)
+        if mode_changed:
+            self.orbit_distance = self._zoom[mode]
+            # Keep orbit azimuth, but restore the new mode's useful elevation.
+            self.orbit_pitch = self._default_pitch
         if self.mode == "COCKPIT":
             self.position = vehicle.position.copy()
             self.forward = vehicle.forward.copy()
             self.right = vehicle.right.copy()
             self.up = vehicle.up.copy()
         else:
-            battledroid=vehicle.flight_state.mode is VehicleMode.BATTLEDROID
-            fighter=vehicle.flight_state.mode is VehicleMode.FIGHTER
-            articulated=getattr(vehicle,"transformation",None) is not None
-            distance=12.0 if battledroid else (CHASE_DISTANCE if fighter or articulated else 8.0)
-            height=4.0 if battledroid else (CHASE_HEIGHT if fighter or articulated else 3.0)
+            ratio = self._zoom[mode]/self._default_distance
+            distance, height = settings.distance*ratio, settings.elevation*ratio
             self._default_basis = vehicle.orientation.copy()
             self._default_pitch = math.atan2(height, distance)
-            self._default_distance = math.hypot(distance, height)
+            self._default_distance = math.hypot(settings.distance, settings.elevation)
             if self.external_camera_mode == "DOLLY":
                 alpha = 1.0 if self._snap else -math.expm1(-CHASE_SMOOTHING * max(0.0, dt))
                 self._view_yaw += (self.orbit_yaw - self._view_yaw) * alpha
@@ -130,7 +166,7 @@ class Camera(Transform):
                 return
             self.orbit_yaw = 0.0
             self.orbit_pitch = self._default_pitch
-            self.orbit_distance = self._default_distance
+            self.orbit_distance = self._zoom[mode]
             desired = (vehicle.position - vehicle.forward * distance
                        + vehicle.up * height)
             alpha = 1.0 if self._snap else -math.expm1(-CHASE_SMOOTHING * max(0.0, dt))

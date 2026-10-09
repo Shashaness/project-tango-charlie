@@ -26,8 +26,8 @@ class OrbitTests(unittest.TestCase):
         self.assertEqual(c.orbit_yaw,0);self.assertAlmostEqual(c.orbit_distance,25)
         v.flight_state.mode=VehicleMode.BATTLEDROID;c.follow(v,1)
         c.orbit_drag(200,0);c.reset_orbit();c.follow(v,0)
-        np.testing.assert_allclose(c.position,v.position-v.forward*12+v.up*4)
-        self.assertAlmostEqual(c.orbit_distance,math.hypot(12,4))
+        np.testing.assert_allclose(c.position,v.position-v.forward*32+v.up*12)
+        self.assertAlmostEqual(c.orbit_distance,math.hypot(32,12))
 
     def test_drag_changes_only_camera_and_yaw_has_full_rotation(self):
         v=self.vehicle;c=self.camera;v.velocity[:]=(10,8,-50)
@@ -59,7 +59,10 @@ class OrbitTests(unittest.TestCase):
         offset=c.position-v.position;distance=c.orbit_distance
         v.position+=(1000,40,-700);v.rotate(yaw=1.5,roll=2)
         v.flight_state.mode=VehicleMode.BATTLEDROID;c.follow(v,1)
-        np.testing.assert_allclose(c.position-v.position,offset,atol=1e-10)
+        self.assertAlmostEqual(c.orbit_yaw,-math.pi/2)
+        self.assertAlmostEqual(c.orbit_distance,math.hypot(32,12))
+        self.assertGreater(np.linalg.norm(c.position-v.position),np.linalg.norm(offset))
+        v.flight_state.mode=VehicleMode.FIGHTER;c.follow(v,10)
         self.assertEqual(c.orbit_distance,distance)
         np.testing.assert_allclose(c.forward,(v.position-c.position)/np.linalg.norm(v.position-c.position),atol=1e-12)
 
@@ -121,15 +124,73 @@ class OrbitTests(unittest.TestCase):
 
 
 class CameraModeTests(unittest.TestCase):
-    def test_default_chase_mouse_inactive_and_continuous_vehicle_follow(self):
+    def test_scroll_callback_zoom_direction_in_chase_and_dolly(self):
+        for external in ('CHASE','DOLLY'):
+            v=PlayerVehicle();c=Camera();c.follow(v,0);i=CameraInput()
+            if external=='DOLLY':c.toggle_external_mode()
+            before=c.orbit_distance
+            i.on_scroll(None,0,1);i.apply(c)
+            self.assertLess(c.orbit_distance,before)
+            i.on_scroll(None,0,-1);i.apply(c)
+            self.assertAlmostEqual(c.orbit_distance,before)
+            self.assertEqual(c.label,external)
+
+    def test_each_mode_limits_and_zoom_persistence(self):
+        v=PlayerVehicle();c=Camera();c.follow(v,0);remembered={}
+        for mode in VehicleMode:
+            v.flight_state.mode=mode;c.follow(v,1)
+            s=c.chase_settings[mode]
+            c.orbit_zoom(10000);self.assertEqual(c.orbit_distance,s.minimum)
+            c.orbit_zoom(-10000);self.assertEqual(c.orbit_distance,s.maximum)
+            c.orbit_zoom(2);remembered[mode]=c.orbit_distance
+        for mode in VehicleMode:
+            v.flight_state.mode=mode;c.follow(v,.01)
+            self.assertEqual(c.orbit_distance,remembered[mode])
+            c.toggle_mode();c.follow(v,.1);c.toggle_mode();c.follow(v,0)
+            self.assertEqual(c.orbit_distance,remembered[mode])
+
+    def test_robot_transition_and_zoom_are_smooth(self):
+        for dolly in (False,True):
+            v=PlayerVehicle();c=Camera();c.follow(v,0)
+            if dolly:c.toggle_external_mode()
+            before=c.position.copy();v.flight_state.mode=VehicleMode.BATTLEDROID
+            c.follow(v,0);np.testing.assert_allclose(c.position,before)
+            c.follow(v,.01)
+            self.assertGreater(np.linalg.norm(c.position-v.position),25)
+            self.assertLess(np.linalg.norm(c.position-v.position),math.hypot(32,12))
+            c.follow(v,10);np.testing.assert_allclose(c.position,v.position+(0,12,32),atol=1e-10)
+            before=c.position.copy();c.orbit_zoom(1);c.follow(v,0)
+            np.testing.assert_allclose(c.position,before)
+            c.follow(v,.01);self.assertLess(np.linalg.norm(c.position-v.position),math.hypot(32,12))
+
+    def test_configurable_camera_profiles(self):
+        from engine.camera import ChaseSettings
+        v=PlayerVehicle();c=Camera(chase_settings={VehicleMode.FIGHTER:ChaseSettings(30,10,20,60)})
+        c.follow(v,0);np.testing.assert_allclose(c.position,v.position+(0,10,30))
+        c.orbit_zoom(10000);self.assertEqual(c.orbit_distance,20)
+        with self.assertRaises(ValueError):ChaseSettings(30,10,40,20)
+
+    def test_camera_anticipates_transform_target_without_changing_physics(self):
+        from types import SimpleNamespace
+        v=PlayerVehicle();c=Camera();c.follow(v,0)
+        v.transformation=SimpleNamespace(active=True,target=VehicleMode.BATTLEDROID)
+        before=c.position.copy();c.follow(v,.05)
+        self.assertIs(v.flight_state.mode,VehicleMode.FIGHTER)
+        self.assertIs(c._vehicle_mode,VehicleMode.BATTLEDROID)
+        self.assertGreater(c.position[2],before[2])
+        v.transformation.target=VehicleMode.FIGHTER;c.follow(v,.05)
+        self.assertIs(c._vehicle_mode,VehicleMode.FIGHTER)
+
+    def test_default_chase_zoom_and_continuous_vehicle_follow(self):
         v=PlayerVehicle();c=Camera();c.follow(v,0)
         self.assertEqual(c.label,'CHASE');self.assertFalse(c._manual_orbit)
         c.orbit_drag(720,100);c.orbit_zoom(4)
         self.assertEqual(c.external_camera_mode,'CHASE');self.assertFalse(c._manual_orbit)
+        ratio=c.orbit_distance/25
         for _ in range(4):
             v.rotate(yaw=.6,pitch=.2,roll=.1);v.position+=v.forward*5
             c.follow(v,10)
-            np.testing.assert_allclose(c.position,v.position-v.forward*24+v.up*7,atol=1e-10)
+            np.testing.assert_allclose(c.position,v.position-v.forward*24*ratio+v.up*7*ratio,atol=1e-10)
 
     def test_dolly_entry_captures_actual_smoothed_chase_offset(self):
         v=PlayerVehicle();c=Camera();c.follow(v,0)

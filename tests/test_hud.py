@@ -15,6 +15,56 @@ from test_vehicle import commands
 
 
 class InstrumentTests(unittest.TestCase):
+    def test_compass_cardinals_from_orientation_in_all_modes(self):
+        from game.flight_instruments import heading_degrees
+        from game.geography import GeographicFrame
+        from game.hgt import LocalProjection
+        for mode in VehicleMode:
+            for expected in (0,90,180,270):
+                vehicle=PlayerVehicle();vehicle.geographic_frame=GeographicFrame(LocalProjection())
+                vehicle.flight_state.mode=mode
+                vehicle.rotate(yaw=-np.radians(expected),pitch=0)
+                vehicle.rotate(pitch=.3)
+                vehicle.rotate(roll=.2)
+                vehicle.velocity[:]=(123,456,789)
+                self.assertAlmostEqual(heading_degrees(vehicle),expected,places=8)
+                self.assertTrue(np.isfinite(HUD().geometry(vehicle,Camera())).all())
+
+    def test_compass_wrap_has_continuous_tick_motion(self):
+        from engine.hud import compass_ticks
+        for before,after in ((359.9,.1),(.1,359.9)):
+            old=next(offset for offset,label in compass_ticks(before) if label=='N')
+            new=next(offset for offset,label in compass_ticks(after) if label=='N')
+            self.assertAlmostEqual(abs(new-old),.2)
+        labels={label for _,label in compass_ticks(45) if label is not None}
+        self.assertTrue({'N','030','060','E'}.issubset(labels))
+
+    def test_compass_camera_independent_and_translation_rebase(self):
+        from game.flight_instruments import heading_degrees
+        from game.geography import GeographicFrame
+        from game.hgt import LocalProjection
+        vehicle=PlayerVehicle((90000,1000,-60000))
+        vehicle.geographic_frame=GeographicFrame(LocalProjection())
+        vehicle.rotate(yaw=-np.radians(123))
+        camera=Camera();hud=HUD()
+        before=hud.geometry(vehicle,camera)
+        camera.rotate(yaw=1,pitch=.5);camera.position[:]=(8000,7000,6000)
+        after=hud.geometry(vehicle,camera)
+        def compass(geometry):
+            return geometry[(geometry[:,0]>450)&(geometry[:,0]<830)&(geometry[:,1]>660)]
+        np.testing.assert_allclose(compass(before),compass(after))
+        geographic=vehicle.geographic_position
+        frame,_=vehicle.geographic_frame.rebase_plan(geographic)
+        vehicle.position[:]=frame.to_local(geographic);vehicle.geographic_frame=frame
+        self.assertAlmostEqual(heading_degrees(vehicle),123)
+        np.testing.assert_allclose(compass(before),compass(hud.geometry(vehicle,camera)))
+
+    def test_compass_vertical_orientation_is_explicitly_undefined(self):
+        from game.flight_instruments import heading_degrees
+        vehicle=PlayerVehicle();vehicle.rotate(pitch=np.pi/2)
+        self.assertIsNone(heading_degrees(vehicle))
+        self.assertTrue(np.isfinite(HUD().geometry(vehicle,Camera())).all())
+
     def test_throttle_persists_clamps_and_does_not_assign_velocity(self):
         vehicle = PlayerVehicle()
         controller = FlightController(vehicle)
@@ -92,6 +142,21 @@ class InstrumentTests(unittest.TestCase):
             self.assertGreater(mesh.return_value.count,0)
             hud.close(); hud.close()
             mesh.return_value.close.assert_called_once()
+
+    def test_normal_hud_geographic_coordinates_and_source_colors(self):
+        from game.geography import GeographicFrame
+        from game.hgt import LocalProjection
+        from engine.hud import HUD_COLOR, PROCEDURAL_COLOR
+        hud, vehicle, camera = HUD(), PlayerVehicle(), Camera()
+        vehicle.geographic_frame = GeographicFrame(LocalProjection())
+        for mapped, expected in ((True, HUD_COLOR), (False, PROCEDURAL_COLOR)):
+            hud.geographic_mapped = mapped
+            geometry = hud.geometry(vehicle, camera, debug=False)
+            coordinates = geometry[(geometry[:,0]>500) & (geometry[:,0]<780)
+                                   & (geometry[:,1]>610) & (geometry[:,1]<655)]
+            self.assertGreater(len(coordinates), 0)
+            np.testing.assert_allclose(coordinates[:,3:],
+                np.broadcast_to(expected, coordinates[:,3:].shape), atol=1e-6)
 
     def test_nonindexed_mesh_preserves_line_primitive(self):
         with patch('engine.mesh.GL') as gl:

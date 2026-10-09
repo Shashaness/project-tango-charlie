@@ -1,3 +1,5 @@
+> M20.5 streaming and geographic registry are documented in [PLANETARY_WORLD.md](PLANETARY_WORLD.md). Historical validation sections below retain their milestone results.
+
 # M20.3 — SRTM terrain LOD foundation
 
 The terrain system adds geographically anchored desert terrain around the existing
@@ -85,7 +87,7 @@ floating-point prediction are rejected rather than adding imagecodecs.
 Point tiles share boundary samples. Area-tile boundary interpolation obtains
 neighboring center samples, including four-tile corners, before retrieving the
 current mapping; this remains safe even with a one-tile cache. Exterior missing
-neighbors use available corner weights and the existing fade to flat ground.
+neighbors use available corner weights; the unified provider blends exterior/void areas into geographic procedural relief.
 Shared and partially shared geographic edges are detected from metadata rather
 than an integer filename grid. Internal connected edges do not fade to zero.
 Overlapping rasters use the first valid result in sorted filename order.
@@ -101,7 +103,7 @@ The nine installed local tiles are automatically discovered. Their metadata show
 3601² signed int16 point rasters, EPSG:4326, 1/3600° spacing, -32767 NoData, and
 uncompressed storage. Together they cover longitude [-112,-109] and latitude
 [33,36]. The geographic origin is unchanged at 34.5, -111.5; loading additional
-tiles does not enlarge the existing 32 km rendered domain or move the city.
+tiles does not move the city. M20.5 streams beyond the original 32 km region.
 
 Start using the local data with the automatically sampled vertical offset:
 
@@ -118,8 +120,8 @@ Example using an explicit directory and offset:
 ```
 
 `TerrainConfig` also exposes domain side length, maximum subdivision level, cells
-per patch, cache size, blend width, and hysteresis. Defaults are a **32 × 32 km**
-domain centered at world X=Z=0, 16 km viewing distance, 64 active patches,
+per patch, cache size, blend width, and hysteresis. Defaults are **32 km root spans**
+in an unbounded regional patch forest, 16 km viewing distance, 64 active patches,
 96 cached GPU patches, five subdivision levels, and 32 cells per patch side.
 The side length is restricted to 22–64 km, viewing distance to 1–20 km, and origins
 to ±80° latitude. Camera controls and its 20 km far clip remain unchanged.
@@ -134,7 +136,7 @@ meter coordinates, never Earth-centered float32 values.
 
 The vertical offset subtracts a source EGM96 elevation from every sampled height.
 When omitted, the origin's bilinear source elevation becomes world zero; an
-unavailable origin uses offset zero. The city and airport always remain at their
+unavailable origin uses its deterministic procedural elevation. The city and airport always remain at their
 existing world elevation zero, independent of this choice.
 
 ## Compatibility and queries
@@ -175,8 +177,8 @@ most ±15% (382.5–517.5 m), with nominal wavelength 1800 m. Only grading width
 varies; protected surfaces cannot be consumed by noise. The default 100 m join
 smoothing can extend influence by at most another 25 m for these two footprints.
 Total default influence is therefore at most about **693 m** outside infrastructure.
-Unavailable dataset exterior borders still fade to flat over 750 m; this is a
-separate missing-data rule, not an infrastructure compatibility zone.
+Unavailable dataset exterior borders blend to procedural relief over 750 m; this
+is a separate missing-data rule from infrastructure compatibility.
 
 All dimensions are configurable on `TerrainConfig`:
 
@@ -199,9 +201,9 @@ there is no separate mesh-only deformation. Original ground tiles remain at Y=0,
 with stitched endpoints. Skirts are omitted on edges inside retained ground and
 continue covering LOD seams elsewhere. No second coplanar base is rendered.
 
-With no elevation files, the environment retains its compact ground and a single
-coarse static terrain patch fills the rest of the domain at Y=0. Missing-data
-fallback does not start mesh subdivision jobs each frame.
+With no elevation files, the environment retains compact flat ground and streams
+deterministic geographic procedural relief. Static meshes are cached; expensive
+subdivision generation runs on a worker.
 
 ```python
 terrain = game.world.terrain
@@ -212,7 +214,8 @@ source = terrain.dataset.sample(latitude, longitude)  # EGM96 meters / NaN
 
 Queries sample the source field and compatibility blend directly, independently
 of visibility, patch cache, and rendered LOD. Normals use centered 10 m finite
-differences on the same field. Missing data returns flat world ground.
+differences on the same field. Missing data returns procedural relief outside
+approved flat infrastructure zones.
 
 **Terrain-aware collision is deferred.** Existing contact remains at Y=0 globally,
 including outside the protected footprint union. Aircraft can intersect rendered
@@ -223,7 +226,7 @@ render meshes. This milestone changes no contact or flight equations.
 ## Patches, selection, and rendering
 
 Each patch is addressed by `(level, x_index, z_index)` in a quadtree. Its bounds
-and children are computed without building meshes. The root spans the domain;
+and children are computed without building meshes. Each root spans one forest cell;
 default finest patches span 1 km with approximately 31.25 m sample spacing.
 Exact ground edges and the compact transition lattice add rows/columns. Coarse source resampling can
 alias small features; LOD does not change source-query fidelity.
@@ -239,13 +242,14 @@ OpenGL 3.3 Core shader. Elevation and slope blend sandy brown, weathered tan, an
 muted rock gray, blending back to the existing desert color at the flat boundary. Directional illumination is baked into colors using source-field
 normals; there is no new lighting shader, vegetation, water, or material system.
 Skirts descend below patch outer edges to cover neighboring LOD differences.
-Their conservative depth is the domain's source elevation range plus 64 m.
-The range is scanned in bounded row chunks at startup, only for intersecting
-tiles. Skirts do not descend inside retained ground footprints.
+Their conservative depth covers the signed-16-bit SRTM elevation envelope plus
+64 m. No source range scan is needed while streaming. Skirts do not descend inside retained ground footprints.
 
 One CPU worker prepares meshes. At most eight tasks are pending and at most two
 meshes upload per rendered frame; the render thread creates/deletes all GL objects.
-The root mesh is prepared at initialization and pinned as a fallback. Descendants
+The origin root is prepared at initialization and pinned for infrastructure.
+Newly reached roots receive bounded nine-vertex procedural fallback geometry
+without raster I/O while full meshes are prepared off-thread. Descendants
 replace a parent only when the required coverage is resident, so coarse parents
 and their descendants are never drawn together. GPU LRU eviction and the desired
 working set are both bounded by the cache size. Ancestors count toward this limit;
@@ -260,8 +264,7 @@ budget is roughly 147,456 triangles for ordinary patches, with additional static
 transition geometry near infrastructure, and at most 64 terrain draw calls, separate
 from the existing single city/environment draw. Compatibility clipping often
 reduces this. Cache limits bound GPU memory; the default is roughly 5–6 MiB for
-96 ordinary patches. These are estimates, not frame-rate guarantees. Startup
-range scans and root generation are synchronous; subdivision mesh generation is
+96 ordinary patches. These are estimates, not frame-rate guarantees. Origin-root generation is synchronous; subdivision mesh generation is
 not performed in the frame loop. Source-query cache misses can map a file on the
 calling thread. Shutdown waits for the currently running bounded mesh task.
 
@@ -269,7 +272,9 @@ calling thread. Shutdown waits for the currently running bounded mesh task.
 
 Press existing **H** in atmosphere mode to show LOD range, active patch count,
 approximate rendered triangles, camera altitude above the queried terrain, and
-currently mapped elevation tile count (`TILES`, either format). No control binding was added.
+currently mapped elevation tile count (`TILES`, either format). M20.5 also shows
+latitude/longitude, geographic cell, source, CPU/GPU caches, LOD distribution and
+queue depth. Stale asynchronous AGL is marked EST. No control binding was added.
 
 ```sh
 .venv/bin/python -m unittest discover -s tests -q
@@ -385,3 +390,12 @@ M20.4 files created: `game/terrain_compatibility.py`,
 `engine/terrain_renderer.py`, `tests/test_terrain.py`,
 `tests/test_world_environment.py`, `tools/check_transformation_gl.py`,
 `docs/TERRAIN_LOD.md`, and `docs/WORLD_ENVIRONMENT.md`. No commit, push, or tag.
+
+
+## M20.5
+
+The fixed boundary is replaced by a streaming root forest, geographic registry,
+and deterministic real/procedural provider. CPU mesh residency is bounded at
+32 meshes / 32 MiB; GPU residency remains at 96 meshes. See
+[PLANETARY_WORLD.md](PLANETARY_WORLD.md) for the algorithm, precision migration,
+actual streaming validation and measured memory/mesh preparation costs.

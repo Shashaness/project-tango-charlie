@@ -6,6 +6,9 @@ import numpy as np
 from engine.asset_paths import PROJECT_ROOT
 from game.hgt import LocalProjection
 from game.elevation import ElevationDataset
+from game.geographic_registry import GeographicRegistry
+from game.planetary_elevation import PlanetaryElevation
+from game.geography import GeographicFrame,GeographicTile
 from game.terrain_compatibility import CompatibilityMask
 
 @lru_cache(maxsize=1)
@@ -16,6 +19,12 @@ def default_footprints():
 @dataclass(frozen=True)
 class TerrainConfig:
     directory: Path = PROJECT_ROOT / 'hgt'
+    registry_directory: Path = PROJECT_ROOT / 'assets/planets/earth/tiles'
+    planetary_seed: int = 205
+    real_blend_width: float = 750.
+    prefetch_seconds: float = 4.
+    cpu_cache_size: int = 32
+    cpu_cache_bytes: int = 32*1024**2
     latitude: float = 34.5
     longitude: float = -111.5
     elevation_offset: float | None = None
@@ -37,6 +46,8 @@ class TerrainConfig:
     def __post_init__(self):
         if not 22000 <= self.side <= 64000 or not 1000 <= self.view_distance <= 20000:
             raise ValueError('Terrain side must be 22–64 km and view distance 1–20 km')
+        if self.side < 2*self.view_distance:
+            raise ValueError('Root patch span must cover the view diameter')
         if not 4 <= self.budget <= 128 or not self.budget+1 <= self.cache_size <= 256:
             raise ValueError('Cache must exceed the 4–128 patch budget')
         if not 1 <= self.max_level <= 6 or not 4 <= self.cells <= 64 or not 0 <= self.hysteresis < .5 or not 0 < self.blend_width <= 5000:
@@ -45,6 +56,8 @@ class TerrainConfig:
             raise ValueError('Invalid compatibility clearance or low-frequency transition variation')
         if not 0 <= self.compatibility_join_width <= 200 or not 25 <= self.compatibility_cell_size <= 100:
             raise ValueError('Invalid compatibility join smoothing or mesh sample spacing')
+        if not isinstance(self.planetary_seed,int) or not 100 <= self.real_blend_width <= 5000 or not 0 <= self.prefetch_seconds <= 10 or not 4 <= self.cpu_cache_size <= 128 or self.cpu_cache_bytes < 1024**2:
+            raise ValueError('Invalid planetary source/streaming settings')
         LocalProjection(self.latitude,self.longitude)
         if self.elevation_offset is not None and not np.isfinite(self.elevation_offset):
             raise ValueError('Elevation offset must be finite')
@@ -56,34 +69,33 @@ class Terrain:
             self.config.flat_clearance,self.config.blend_width,self.config.transition_variation,
             self.config.transition_wavelength,self.config.compatibility_seed,self.config.compatibility_join_width)
         self.projection = LocalProjection(self.config.latitude, self.config.longitude)
-        self.dataset = ElevationDataset(self.config.directory)
-        self.enabled = bool(self.dataset.paths)
-        origin = float(self.dataset.sample(self.config.latitude, self.config.longitude))
-        self.offset = self.config.elevation_offset if self.config.elevation_offset is not None else (origin if np.isfinite(origin) else 0.)
-        half = self.config.side/2
-        north,west = self.projection.to_geographic(-half,-half)
-        south,east = self.projection.to_geographic(half,half)
-        keys = self.dataset.intersecting(south,west,north,east)
-        low, high = self.dataset.elevation_range(keys)
-        self.elevation_bounds = min(0., low-self.offset), max(0., high-self.offset)
+        self.registry = GeographicRegistry(self.config.registry_directory,self.config.directory)
+        self.dataset = ElevationDataset(self.config.directory,paths=self.registry.elevation_paths)
+        self.dataset.warnings[:0]=self.registry.warnings
+        self.provider = PlanetaryElevation(self.dataset,self.projection,self.config.planetary_seed,self.config.real_blend_width)
+        self.enabled = True
+        origin = float(self.provider.sample(self.config.latitude,self.config.longitude))
+        self.offset = self.config.elevation_offset if self.config.elevation_offset is not None else origin
+        self.frame = GeographicFrame(self.projection,self.offset)
+        # Conservative universal source bounds avoid rescanning when the window moves.
+        self.elevation_bounds = min(0.,-32768-self.offset),max(0.,32767-self.offset)
         self.skirt_depth = self.elevation_bounds[1]-self.elevation_bounds[0]+64.
 
-    def heights(self, x, z):
-        x, z = np.broadcast_arrays(np.asarray(x, float), np.asarray(z, float))
-        lat, lon = self.projection.to_geographic(x, z)
-        raw = np.nan_to_num(self.dataset.sample(lat, lon)-self.offset, nan=0.)
-        coverage = self.dataset.coverage_weight(lat,lon,self.projection.east_scale,self.projection.north_scale)
-        return raw * self.compatibility_weight(x,z) * coverage
+    def heights(self, x, z, procedural_only=False):
+        x,z=np.broadcast_arrays(np.asarray(x,float),np.asarray(z,float))
+        lat,lon=self.projection.to_geographic(x,z)
+        raw=(self.provider.procedural.sample(lat,lon) if procedural_only else self.provider.sample(lat,lon))-self.offset
+        return raw*self.compatibility_weight(x,z)
 
     def compatibility_weight(self, x, z):
         return self.compatibility.weight(x,z)
 
     def height_at(self, x, z): return float(self.heights(x, z))
 
-    def normals(self, x, z):
+    def normals(self, x, z, procedural_only=False):
         step = 10.
-        dx = (self.heights(np.asarray(x)+step,z)-self.heights(np.asarray(x)-step,z))/(2*step)
-        dz = (self.heights(x,np.asarray(z)+step)-self.heights(x,np.asarray(z)-step))/(2*step)
+        dx = (self.heights(np.asarray(x)+step,z,procedural_only)-self.heights(np.asarray(x)-step,z,procedural_only))/(2*step)
+        dz = (self.heights(x,np.asarray(z)+step,procedural_only)-self.heights(x,np.asarray(z)-step,procedural_only))/(2*step)
         normal = np.stack((-dx, np.ones_like(dx), -dz), axis=-1)
         return normal/np.linalg.norm(normal, axis=-1, keepdims=True)
 
@@ -93,6 +105,20 @@ class Terrain:
         level, ix, iz = key; size = self.config.side/(2**level); start = -self.config.side/2
         return start+ix*size, start+(ix+1)*size, start+iz*size, start+(iz+1)*size
 
+    def root_at(self, x, z):
+        half=self.config.side/2
+        return (0,int(np.floor((x+half)/self.config.side)),int(np.floor((z+half)/self.config.side)))
+
+    def roots_near(self, position, margin=0.):
+        distance=self.config.view_distance+margin
+        first=self.root_at(position[0]-distance,position[2]-distance)
+        last=self.root_at(position[0]+distance,position[2]+distance)
+        return [(0,x,z) for x in range(first[1],last[1]+1) for z in range(first[2],last[2]+1)]
+
+    def geographic_identity(self, key):
+        a,b,c,d=self.bounds(key);lat,lon=self.projection.to_geographic((a+b)/2,(c+d)/2)
+        return ('earth',self.config.latitude,self.config.longitude,self.config.side,GeographicTile.at(float(lat),float(lon)).identifier,*key)
+
     def excluded(self, key):
         return self.compatibility.excludes_patch(self.bounds(key))
 
@@ -101,14 +127,14 @@ class Terrain:
         level,x,z = key
         return [(level+1,2*x+i,2*z+j) for i in range(2) for j in range(2)]
 
-    def mesh(self, key):
+    def mesh(self, key, procedural_only=False, cells=None, local=False, coarse_fallback=False):
         a,b,c,d = self.bounds(key)
         # Insert every retained ground edge, so exclusion is an exact partition
         # at all levels rather than dropping triangles by an approximate mask.
         footprints = self.compatibility.footprints
-        xs = np.unique(np.r_[np.linspace(a,b,self.config.cells+1),
+        xs = np.unique(np.r_[np.linspace(a,b,(self.config.cells if cells is None else cells)+1),
             [v for r in footprints for v in r[:2] if a < v < b]])
-        zs = np.unique(np.r_[np.linspace(c,d,self.config.cells+1),
+        zs = np.unique(np.r_[np.linspace(c,d,(self.config.cells if cells is None else cells)+1),
             [v for r in footprints for v in r[2:] if c < v < d]])
         # Stable subgrid near infrastructure resolves grading even on the pinned
         # root fallback; rows outside this compact neighborhood retain normal LOD.
@@ -118,7 +144,7 @@ class Terrain:
             if f+radius < a or e-radius > b or h+radius < c or g-radius > d: continue
             xs = np.unique(np.r_[xs,np.arange(np.ceil(max(a,e-radius)/detail_step)*detail_step,min(b,f+radius)+1e-8,detail_step)])
             zs = np.unique(np.r_[zs,np.arange(np.ceil(max(c,g-radius)/detail_step)*detail_step,min(d,h+radius)+1e-8,detail_step)])
-        x,z = np.meshgrid(xs,zs); y = self.heights(x,z); normal = self.normals(x,z)
+        x,z = np.meshgrid(xs,zs); y = self.heights(x,z,procedural_only); normal = np.broadcast_to([0.,1.,0.],(*x.shape,3)) if coarse_fallback else self.normals(x,z,procedural_only)
         sun = np.array([-.4,.8,-.3]); sun /= np.linalg.norm(sun)
         light = .45+.55*np.maximum(normal@sun,0)
         rock = np.clip((1-normal[...,1])*2 + np.abs(y)/5000,0,1)[...,None]
@@ -142,7 +168,10 @@ class Terrain:
                 for index in (first,second):
                     vertex = vertices[index].copy(); vertex[1] -= self.skirt_depth; vertices.append(vertex)
                 indices.extend((first,second,start,second,start+1,start))
-        return np.asarray(vertices,np.float32), np.asarray(indices,np.uint32)
+        vertices=np.asarray(vertices,float)
+        if local:
+            vertices[:,0]-=(a+b)/2;vertices[:,2]-=(c+d)/2
+        return vertices.astype(np.float32),np.asarray(indices,np.uint32)
 
 class TerrainSelector:
     def __init__(self, terrain): self.terrain = terrain; self.split = set()
@@ -173,15 +202,15 @@ class TerrainSelector:
             threshold = (b-a)*1.3*(1+config.hysteresis if key in self.split else 1-config.hysteresis)
             children = tuple(child for child in terrain.children(key) if visible(child))
             return distance,threshold,b-a,children
-        leaves = [(0,0,0)] if visible((0,0,0)) else []; split = set()
+        leaves = [key for key in terrain.roots_near(position) if visible(key)]; split = set()
         while True:
             candidates = []
             for key in leaves:
                 if key[0] >= config.max_level: continue
                 distance,threshold,size,children = refinement(key)
                 if distance < threshold and len(leaves)-1+len(children) <= config.budget:
-                    candidates.append((distance/size,key,children))
+                    candidates.append((0 if key in self.split else 1,distance/size,key,children))
             if not candidates: break
-            _,key,children = min(candidates); leaves.remove(key); leaves.extend(children); split.add(key)
+            _,_,key,children = min(candidates); leaves.remove(key); leaves.extend(children); split.add(key)
         self.split = split
         return sorted(leaves)

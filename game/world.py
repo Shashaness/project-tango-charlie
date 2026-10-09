@@ -12,6 +12,9 @@ class World:
         self.environment = WorldEnvironment()
         from game.terrain import Terrain
         self.terrain = Terrain(terrain_config, self.environment.protected_footprints)
+        from game.world_environment import CITY_CENTER, RUNWAY
+        self.geographic_anchors = dict(city=self.terrain.frame.from_local((CITY_CENTER[0],0,CITY_CENTER[1])),
+            airport=self.terrain.frame.from_local(RUNWAY.center))
         self.targets = [
             Target(1,  (0, 0, -1000)),
             Target(2,  (-500, 100, -1500), (50, 0, 0)),

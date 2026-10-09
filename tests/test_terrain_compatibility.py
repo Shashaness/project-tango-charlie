@@ -124,8 +124,9 @@ class CompatibilityTests(unittest.TestCase):
         terrain=Terrain(replace(self.terrain.config,directory=Path(self.temp.name)/'missing'))
         resources=TerrainResources(terrain,Mesh)
         resources.update((0,100,0))
-        self.assertEqual(resources.active,[(0,0,0)])
-        self.assertFalse(resources.pending)
+        self.assertTrue(resources.active)
+        self.assertLessEqual(len(resources.active),terrain.config.budget)
+        self.assertLessEqual(len(resources.pending),8)
         self.assertGreater(resources.stats['triangles'],0)
         resources.close()
 

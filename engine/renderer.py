@@ -239,11 +239,14 @@ class Renderer:
             self.mesh.draw()
         self.shader.set_matrix("model", np.eye(4, dtype=np.float32))
         self.hud.terrain_debug = None
+        geographic = self.vehicle.geographic_position
+        self.hud.geographic_mapped = geographic is not None and self.world.terrain.dataset.has_coverage(
+            geographic.latitude, geographic.longitude)
         if atmosphere:
             self.environment_mesh.draw()
             if self.terrain_resources is not None:
-                self.terrain_resources.update(self.camera.position, self.camera.projection_matrix() @ self.camera.view_matrix())
-                self.terrain_resources.draw()
+                self.terrain_resources.update(self.camera.position, self.camera.projection_matrix() @ self.camera.view_matrix(), self.vehicle.position, self.vehicle.velocity)
+                self.terrain_resources.draw(self.shader,self.camera)
                 self.hud.terrain_debug = self.terrain_resources.stats
             else:
                 self.hud.terrain_debug = dict(lod='NONE',patches=0,triangles=0,agl=float(self.camera.position[1]),tiles=0)

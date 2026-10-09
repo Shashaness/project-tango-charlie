@@ -115,7 +115,8 @@ class GeoTiffTests(unittest.TestCase):
         self.assertEqual(float(dataset.coverage_weight(34.5,-111,90000,110000)),0)
         terrain=Terrain(TerrainConfig(directory=self.directory))
         self.datasets.append(terrain.dataset)
-        self.assertEqual(terrain.height_at(13000,12000),0)
+        lat,lon=terrain.projection.to_geographic(13000,12000)
+        self.assertAlmostEqual(terrain.height_at(13000,12000),float(terrain.provider.procedural.sample(lat,lon))-terrain.offset)
 
     def test_reject_unsupported_crs_and_malformed_georeferencing(self):
         for name,options in (('projected',{'crs':32612,'model_type':1}),

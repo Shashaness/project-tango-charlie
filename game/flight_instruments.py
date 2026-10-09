@@ -12,9 +12,13 @@ STANDARD_GRAVITY = 9.80665
 
 def heading_degrees(vehicle):
     forward = vehicle.forward
-    if not np.isfinite(forward).all() or math.hypot(forward[0], forward[2]) < 1e-6:
+    frame = getattr(vehicle, 'geographic_frame', None)
+    east, north, _ = frame.horizontal_basis() if frame is not None else (
+        np.array((1.,0.,0.)), np.array((0.,0.,-1.)), np.array((0.,1.,0.)))
+    e, n = float(np.dot(forward, east)), float(np.dot(forward, north))
+    if not np.isfinite(forward).all() or math.hypot(e, n) < 1e-6:
         return None  # horizontal heading undefined when pointing vertically
-    return math.degrees(math.atan2(forward[0], -forward[2])) % 360
+    return math.degrees(math.atan2(e, n)) % 360
 
 
 def vertical_speed(vehicle):

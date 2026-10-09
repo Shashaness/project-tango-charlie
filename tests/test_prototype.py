@@ -101,9 +101,9 @@ class PrototypeTests(TestCase):
             renderer.close();renderer.close()
         resources.close.assert_called_once()
 
-    def test_vtol_chase_offset_preserved(self):
+    def test_vtol_chase_profile(self):
         from engine.camera import Camera
         from game.flight_state import VehicleMode
         vehicle=PlayerVehicle();vehicle.flight_state.mode=VehicleMode.VTOL
         camera=Camera();camera.follow(vehicle,0)
-        np.testing.assert_allclose(camera.position,vehicle.position-vehicle.forward*8+vehicle.up*3)
+        np.testing.assert_allclose(camera.position,vehicle.position-vehicle.forward*18+vehicle.up*6)

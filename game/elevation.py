@@ -12,6 +12,9 @@ import tifffile
 from game.hgt import HgtTile, VOID
 
 _TOLERANCE = 1e-10
+def aligned_longitude(info, longitude):
+    return longitude+360*np.rint(((info.west+info.east)/2-longitude)/360)
+
 _SUPPORTED_COMPRESSION = {1, 8, 32946}  # uncompressed, Adobe/legacy DEFLATE
 
 @dataclass(frozen=True)
@@ -142,6 +145,7 @@ class ElevationTile:
                 with tifffile.TiffFile(info.path) as file:
                     self.samples = file.pages[0].asarray(out='memmap',maxworkers=1)
         self.closed = False
+        self.confidence_grid = None
 
     def valid(self, values):
         mask = np.isfinite(values)
@@ -174,6 +178,26 @@ class ElevationTile:
             denominator += accepted*weight
         return np.divide(numerator,denominator,out=np.full(lat.shape,np.nan),where=valid&(denominator>0))
 
+    def confidence(self, latitude, longitude):
+        if self.confidence_grid is None:
+            rows,cols=self.info.shape;self.confidence_step=max(1,int(np.ceil(max(rows,cols)/256)))
+            step=self.confidence_step;nr=(rows+step-1)//step;nc=(cols+step-1)//step
+            cells=np.ones((nr,nc),dtype=bool)
+            for r in range(nr):
+                valid=np.all(self.valid(self.samples[r*step:min((r+1)*step,rows)]),axis=0)
+                cells[r]=np.logical_and.reduceat(valid,np.arange(0,cols,step))
+            nodes=np.ones((nr+1,nc+1),dtype=np.float32)
+            for dr,dc in ((0,0),(0,1),(1,0),(1,1)):
+                nodes[dr:dr+nr,dc:dc+nc]*=cells
+            self.confidence_grid=nodes
+        grid=self.confidence_grid;step=self.confidence_step
+        row=np.clip((self.info.sample_north-latitude)/self.info.y_step/step,0,grid.shape[0]-1)
+        col=np.clip((longitude-self.info.sample_west)/self.info.x_step/step,0,grid.shape[1]-1)
+        r=np.minimum(row.astype(int),grid.shape[0]-2);c=np.minimum(col.astype(int),grid.shape[1]-2)
+        fy,fx=row-r,col-c
+        t=grid[r,c]*(1-fy)*(1-fx)+grid[r,c+1]*(1-fy)*fx+grid[r+1,c]*fy*(1-fx)+grid[r+1,c+1]*fy*fx
+        return t*t*t*(10+t*(-15+6*t))
+
     def elevation_range(self):
         low=high=0.
         for start in range(0,self.info.shape[0],128):
@@ -190,14 +214,16 @@ class ElevationTile:
 
 class ElevationDataset:
     """Common elevation interface; metadata indexing does not decode rasters."""
-    def __init__(self, directory, capacity=4, cache_bytes=128*1024**2, max_tile_bytes=64*1024**2):
+    def __init__(self, directory, capacity=4, cache_bytes=128*1024**2, max_tile_bytes=64*1024**2, paths=None):
         if capacity < 1 or cache_bytes < 1 or max_tile_bytes < 1:
             raise ValueError('Elevation cache limits must be positive')
         self.capacity=capacity; self.cache_bytes=cache_bytes
         self.max_tile_bytes=min(max_tile_bytes,cache_bytes)
         self.rasters={}; self.paths={}; self.warnings=[]; self.cache=OrderedDict()
-        self.lock=threading.RLock(); self.resident_bytes=0
-        for path in sorted(p for p in Path(directory).glob('*') if p.suffix.lower() in ('.hgt','.tif','.tiff')):
+        self.lock=threading.RLock(); self.resident_bytes=0; self.unavailable=set()
+        candidates = paths if paths is not None else sorted(p for p in Path(directory).glob('*') if p.suffix.lower() in ('.hgt','.tif','.tiff'))
+        for path in candidates:
+            path=Path(path)
             try:
                 info=inspect_raster(path)
                 if info.nbytes > self.max_tile_bytes:
@@ -207,7 +233,9 @@ class ElevationDataset:
                 self.warnings.append(f'{path.name}: {error}')
         self._neighbors={}
         for path,info in self.rasters.items():
-            others=[other for key,other in self.rasters.items() if key!=path]
+            from dataclasses import replace
+            others=[replace(other,west=other.west+shift,east=other.east+shift)
+                    for key,other in self.rasters.items() for shift in (-360,0,360) if key!=path or shift!=0]
             self._neighbors[path]=(
                 [o for o in others if o.west < info.west-_TOLERANCE and o.east >= info.west-_TOLERANCE],
                 [o for o in others if o.east > info.east+_TOLERANCE and o.west <= info.east+_TOLERANCE],
@@ -215,21 +243,30 @@ class ElevationDataset:
                 [o for o in others if o.north > info.north+_TOLERANCE and o.south <= info.north+_TOLERANCE])
 
     def _tile(self, path):
+        if path in self.unavailable: return None
         if path in self.cache:
             self.cache.move_to_end(path); return self.cache[path]
         info=self.rasters[path]
         while self.cache and (len(self.cache)>=self.capacity or self.resident_bytes+info.nbytes>self.cache_bytes):
             _,old=self.cache.popitem(last=False)
             self.resident_bytes-=old.info.nbytes; old.close()
-        tile=ElevationTile(info); self.cache[path]=tile; self.resident_bytes+=info.nbytes
+        try:
+            tile=ElevationTile(info)
+        except (OSError,tifffile.TiffFileError,ValueError) as error:
+            self.unavailable.add(path);self.warnings.append(f'{path.name}: read failed: {error}')
+            return None
+        self.cache[path]=tile; self.resident_bytes+=info.nbytes
         return tile
 
     def _center_samples(self, latitude, longitude):
         # Copy corner values before any further cache lookup can evict their tile.
         result=np.full(latitude.shape,np.nan)
         for path,info in self.rasters.items():
-            mask=np.isnan(result)&info.contains(latitude,longitude,centers=True)
-            if np.any(mask): result[mask]=self._tile(path).sample(latitude[mask],longitude[mask])
+            local_lon=aligned_longitude(info,longitude)
+            mask=np.isnan(result)&info.contains(latitude,local_lon,centers=True)
+            if np.any(mask):
+                tile=self._tile(path)
+                if tile is not None: result[mask]=tile.sample(latitude[mask],local_lon[mask])
         return result
 
     def sample(self, latitude, longitude):
@@ -237,12 +274,13 @@ class ElevationDataset:
         result=np.full(lat.shape,np.nan)
         with self.lock:
             for path,info in self.rasters.items():
-                mask=np.isnan(result)&info.contains(lat,lon)
+                local_lon=aligned_longitude(info,lon)
+                mask=np.isnan(result)&info.contains(lat,local_lon)
                 if not np.any(mask): continue
                 # PixelIsArea boundary interpolation can access neighboring rasters.
                 # Gather those samples first to avoid evicting a live current mapping.
                 row=(info.sample_north-lat[mask])/info.y_step
-                col=(lon[mask]-info.sample_west)/info.x_step
+                col=(local_lon[mask]-info.sample_west)/info.x_step
                 corners={}
                 for dr,dc in ((0,0),(0,1),(1,0),(1,1)):
                     rr=np.floor(row+1e-10).astype(int)+dr; cc=np.floor(col+1e-10).astype(int)+dc
@@ -254,24 +292,50 @@ class ElevationDataset:
                         for a,b,value in zip(corner_lat,corner_lon,values): corners[(round(float(a),12),round(float(b),12))]=value
                 def neighbor_sample(a,b):
                     return np.asarray([corners.get((round(float(x),12),round(float(y),12)),np.nan) for x,y in zip(a,b)])
-                result[mask]=self._tile(path).sample(lat[mask],lon[mask],neighbor_sample)
+                tile=self._tile(path)
+                if tile is not None: result[mask]=tile.sample(lat[mask],local_lon[mask],neighbor_sample)
         return result
 
     def coverage_weight(self, latitude, longitude, east_scale, north_scale, width=750.):
         lat,lon=np.broadcast_arrays(latitude,longitude); coverage=np.zeros(lat.shape)
         for path,info in self.rasters.items():
-            mask=info.contains(lat,lon); fade=np.ones(lat.shape)
-            distances=((lon-info.west)*east_scale,(info.east-lon)*east_scale,
+            if path in self.unavailable: continue
+            local_lon=aligned_longitude(info,lon)
+            mask=info.contains(lat,local_lon); fade=np.ones(lat.shape)
+            distances=((local_lon-info.west)*east_scale,(info.east-local_lon)*east_scale,
                        (lat-info.south)*north_scale,(info.north-lat)*north_scale)
             for side,(neighbors,distance) in enumerate(zip(self._neighbors[path],distances)):
                 connected=np.zeros(lat.shape,dtype=bool)
                 for neighbor in neighbors:
+                    if neighbor.path in self.unavailable: continue
                     connected |= ((lat>=neighbor.south-_TOLERANCE)&(lat<=neighbor.north+_TOLERANCE) if side<2
-                                  else (lon>=neighbor.west-_TOLERANCE)&(lon<=neighbor.east+_TOLERANCE))
+                                  else (local_lon>=neighbor.west-_TOLERANCE)&(local_lon<=neighbor.east+_TOLERANCE))
                 fade=np.minimum(fade,np.where(connected,1.,np.clip(distance/width,0,1)))
             fade=fade*fade*(3-2*fade)
             coverage=np.maximum(coverage,np.where(mask,fade,0))
         return coverage
+
+    def has_coverage(self, latitude, longitude):
+        """Metadata-only map availability; no raster decoding on the HUD thread."""
+        return any(path not in self.unavailable and bool(info.contains(
+            latitude, aligned_longitude(info, longitude)))
+            for path, info in self.rasters.items())
+
+    def confidence(self, latitude, longitude, east_scale, north_scale, width=750.):
+        lat,lon=np.broadcast_arrays(latitude,longitude);confidence=np.ones(lat.shape)
+        with self.lock:
+            for path,info in self.rasters.items():
+                local_lon=aligned_longitude(info,lon)
+                dx=np.maximum.reduce((info.west-local_lon,local_lon-info.east,np.zeros(lat.shape)))*east_scale
+                dz=np.maximum.reduce((info.south-lat,lat-info.north,np.zeros(lat.shape)))*north_scale
+                distance=np.hypot(dx,dz);near=distance<width
+                if not np.any(near):continue
+                tile=self._tile(path)
+                if tile is None:continue
+                validity=tile.confidence(lat[near],local_lon[near])
+                t=np.clip(distance[near]/width,0,1);influence=1-t*t*t*(10+t*(-15+6*t))
+                confidence[near]=np.minimum(confidence[near],1-(1-validity)*influence)
+        return confidence
 
     def intersecting(self, south, west, north, east):
         return {path for path,info in self.rasters.items() if info.intersects(south,west,north,east)}
@@ -281,7 +345,9 @@ class ElevationDataset:
         with self.lock:
             for path in self.rasters:
                 if keys is not None and path not in keys: continue
-                tile_low,tile_high=self._tile(path).elevation_range()
+                tile=self._tile(path)
+                if tile is None: continue
+                tile_low,tile_high=tile.elevation_range()
                 low=min(low,tile_low); high=max(high,tile_high)
         return low,high
 

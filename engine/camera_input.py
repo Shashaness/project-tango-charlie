@@ -38,7 +38,7 @@ class CameraInput:
             self.drag = (0.,0.)
             self.scroll = 0.
             self._last_cursor = None
-        if camera.mode == 'CHASE' and camera.external_camera_mode == 'DOLLY':
+        if camera.mode == 'CHASE':
             if self.reset_pressed:camera.reset_orbit()
             else:
                 camera.orbit_drag(*self.drag)

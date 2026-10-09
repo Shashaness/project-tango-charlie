@@ -9,6 +9,11 @@ from game.atmospheric_physics import AeroForces
 
 
 class PlayerVehicle(Transform):
+    @property
+    def geographic_position(self):
+        frame=getattr(self,'geographic_frame',None)
+        return None if frame is None else frame.from_local(self.position)
+
     def __init__(self, position=(0, 0, 3)):
         super().__init__(position)
         self.flight_state = FlightState()
