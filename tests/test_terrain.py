@@ -93,9 +93,9 @@ class TerrainTests(unittest.TestCase):
         self.assertEqual(self.terrain.height_at(*RUNWAY.spawn_xz),0)
         self.assertEqual(self.terrain.height_at(0,-300),0)
         np.testing.assert_allclose(self.terrain.normal_at(0,0),(0,1,0))
-        # Smooth transition on the east edge of the unchanged ground rectangle.
-        self.assertEqual(self.terrain.height_at(9000,0),0)
-        self.assertLess(abs(self.terrain.height_at(9001,0)),.01)
+        # Smooth transition beyond the compact city footprint and 150 m clearance.
+        self.assertEqual(self.terrain.height_at(900,0),0)
+        self.assertLess(abs(self.terrain.height_at(901,0)),.01)
         normal=self.terrain.normal_at(13000,12000)
         self.assertAlmostEqual(np.linalg.norm(normal),1)
         self.assertLess(normal[0],0); self.assertGreater(normal[2],0)
@@ -110,10 +110,9 @@ class TerrainTests(unittest.TestCase):
         # Only top triangles have nonzero XZ area. Skirts are vertical.
         cross=np.cross(triangles[:,1]-triangles[:,0],triangles[:,2]-triangles[:,0])
         centers=triangles.mean(axis=1); top=np.abs(cross[:,1])>1
-        a,b,c,d=TERRAIN_BOUNDS
-        self.assertFalse(np.any(top & (centers[:,0]>a)&(centers[:,0]<b)&(centers[:,2]>c)&(centers[:,2]<d)))
+        self.assertFalse(np.any(top & self.terrain.compatibility.contains(centers[:,0],centers[:,2],strict=True)))
         self.assertTrue(np.all(cross[top,1]>0))
-        edge=vertices[(vertices[:,0]==9000)&(vertices[:,2]>=c)&(vertices[:,2]<=d)]
+        edge=vertices[(vertices[:,0]==750)&(vertices[:,2]>=-1050)&(vertices[:,2]<=450)]
         self.assertTrue(len(edge)); self.assertTrue(np.all(edge[:,1]==0))
         np.testing.assert_allclose(edge[:,3:],np.tile([.57,.48,.36],(len(edge),1)),atol=1e-7)
 

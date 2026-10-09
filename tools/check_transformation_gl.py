@@ -118,7 +118,10 @@ def main():
                 for label,position,forward in (
                     ('TERRAIN_NEAR',(12000,1400,14000),(-.35,-.2,-1)),
                     ('TERRAIN_BOUNDARY',(10500,800,5000),(-1,-.12,-.3)),
-                    ('TERRAIN_FAR',(0,14000,10000),(0,-1,-.4))):
+                    ('TERRAIN_FAR',(0,14000,10000),(0,-1,-.4)),
+                    ('TERRAIN_CITY_EDGE',(1800,300,1000),(-1,-.17,-.55)),
+                    ('TERRAIN_AIRPORT_EDGE',(1300,300,3500),(-1,-.1,-.3)),
+                    ('TERRAIN_COMPACT_PLAN',(0,4500,1400),(0,-1,-.3))):
                     game.camera.position[:]=position
                     direction=np.asarray(forward,float);direction/=np.linalg.norm(direction)
                     right=np.cross(direction,[0,1,0]);right/=np.linalg.norm(right)

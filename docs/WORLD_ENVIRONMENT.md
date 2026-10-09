@@ -216,7 +216,7 @@ integrate conservative swept volumes into all vehicle substeps, define safe slid
 and aircraft impacts, and keep roof contacts separate from flat-ground landing
 telemetry. No partial per-frame point clamp is introduced. Do not use rooftops as
 landing surfaces. Weapons/AI retain their existing collision/terrain behavior and
-can pass through scenery. Ground terrain is a finite 18 km visual square while
+can pass through scenery. The compact city/airport ground joins the finite 32 km SRTM terrain domain while
 physics retains its infinite plane. Static scene bounds stay within a few km of
 the origin, without floating-origin machinery.
 
@@ -287,3 +287,36 @@ moving views were visually inspected: the central/district parks, block spacing,
 avenues, mixed heights and sparse outer development are visible, with no observed
 return of ground striping or pavement seam pinholes in those captures. Graphical
 checks do not override the two model-specific automated failures described above.
+
+## M20.4 compact terrain integration
+
+The world no longer renders its old 18 × 18 km desert base. After composing the
+existing infrastructure materials, it derives separate city and airport envelopes
+from recorded surface/structure footprints and crops only exterior base ground.
+The retained city rectangle is X=[-750,750], Z=[-1050,450] (1500² m); the airport
+is X=[-76,396], Z=[1194,3806] (472 × 2612 m). Their union covers 3.483 km².
+The airport envelope includes its enclosed sandy yard and access/perimeter areas.
+All existing roads, parks, pavement, markings, buildings and runway geometry keep
+their positions and elevations. Ground still uses a single static batch with
+stitched tile endpoints; terrain meshes omit this exact retained union.
+
+The shared terrain compatibility mask supplies 150 m rounded flat clearance,
+about 450 m grading with deterministic low-frequency ±15% width variation, and
+a 100 m smooth join between grading lobes. Flat buffers total about 5.45 km²,
+rather than the old 324 km². Ordinary grading ends within about 693 m of actual
+infrastructure. Source heights, normals, mesh samples and color blending use the
+same mask. A static 50 m local lattice preserves the compact transition at coarse
+LOD. See [TERRAIN_LOD.md](TERRAIN_LOD.md) for configurable dimensions and queries.
+
+F4, runway 36/18, FIGHTER ground roll, VTOL support, Battledroid locomotion and
+flight forces are unchanged. Terrain-aware collision remains deferred: physics
+still uses Y=0 outside infrastructure as well. User-supplied SRTM files provide
+the surrounding elevations; without files one coarse flat terrain patch provides
+continuous fallback ground outside the compact environment.
+
+M20.4 validation preserves all 30,684 building/structure vertices and 1,117
+infrastructure ground tiles. The compact environment contains 1172 ground tiles
+and 51,630 total vertices. Area-partition and shared-edge checks pass for retained
+ground and terrain. Full suite: 333/335 pass, with the same two existing model
+assertions failing. Three combined OpenGL cycles pass; compact overhead, city-edge
+and airport-edge captures are in `/tmp/m204-final`.

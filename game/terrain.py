@@ -6,7 +6,12 @@ import numpy as np
 from engine.asset_paths import PROJECT_ROOT
 from game.hgt import LocalProjection
 from game.elevation import ElevationDataset
-from game.world_environment import TERRAIN_BOUNDS
+from game.terrain_compatibility import CompatibilityMask
+
+@lru_cache(maxsize=1)
+def default_footprints():
+    from game.world_environment import WorldEnvironment
+    return WorldEnvironment().protected_footprints
 
 @dataclass(frozen=True)
 class TerrainConfig:
@@ -20,7 +25,13 @@ class TerrainConfig:
     max_level: int = 5
     cells: int = 32
     cache_size: int = 96
-    blend_width: float = 1500.
+    blend_width: float = 450.
+    flat_clearance: float = 150.
+    transition_variation: float = .15
+    transition_wavelength: float = 1800.
+    compatibility_seed: int = 20
+    compatibility_join_width: float = 100.
+    compatibility_cell_size: float = 50.
     hysteresis: float = .15
 
     def __post_init__(self):
@@ -30,13 +41,20 @@ class TerrainConfig:
             raise ValueError('Cache must exceed the 4–128 patch budget')
         if not 1 <= self.max_level <= 6 or not 4 <= self.cells <= 64 or not 0 <= self.hysteresis < .5 or not 0 < self.blend_width <= 5000:
             raise ValueError('Invalid terrain subdivision or blend configuration')
+        if not 0 <= self.flat_clearance <= 500 or not 0 <= self.transition_variation <= .3 or not 1000 <= self.transition_wavelength <= 10000:
+            raise ValueError('Invalid compatibility clearance or low-frequency transition variation')
+        if not 0 <= self.compatibility_join_width <= 200 or not 25 <= self.compatibility_cell_size <= 100:
+            raise ValueError('Invalid compatibility join smoothing or mesh sample spacing')
         LocalProjection(self.latitude,self.longitude)
         if self.elevation_offset is not None and not np.isfinite(self.elevation_offset):
             raise ValueError('Elevation offset must be finite')
 
 class Terrain:
-    def __init__(self, config=None):
+    def __init__(self, config=None, footprints=None):
         self.config = config or TerrainConfig()
+        self.compatibility = CompatibilityMask(footprints or default_footprints(),
+            self.config.flat_clearance,self.config.blend_width,self.config.transition_variation,
+            self.config.transition_wavelength,self.config.compatibility_seed,self.config.compatibility_join_width)
         self.projection = LocalProjection(self.config.latitude, self.config.longitude)
         self.dataset = ElevationDataset(self.config.directory)
         self.enabled = bool(self.dataset.paths)
@@ -58,11 +76,7 @@ class Terrain:
         return raw * self.compatibility_weight(x,z) * coverage
 
     def compatibility_weight(self, x, z):
-        x,z = np.broadcast_arrays(np.asarray(x,float),np.asarray(z,float))
-        xmin,xmax,zmin,zmax = TERRAIN_BOUNDS
-        distance = np.maximum.reduce((xmin-x,x-xmax,zmin-z,z-zmax,np.zeros(x.shape)))
-        t = np.clip(distance/self.config.blend_width,0,1)
-        return t*t*(3-2*t)
+        return self.compatibility.weight(x,z)
 
     def height_at(self, x, z): return float(self.heights(x, z))
 
@@ -80,8 +94,7 @@ class Terrain:
         return start+ix*size, start+(ix+1)*size, start+iz*size, start+(iz+1)*size
 
     def excluded(self, key):
-        a,b,c,d = self.bounds(key); e,f,g,h = TERRAIN_BOUNDS
-        return e <= a and b <= f and g <= c and d <= h
+        return self.compatibility.excludes_patch(self.bounds(key))
 
     @staticmethod
     def children(key):
@@ -89,10 +102,22 @@ class Terrain:
         return [(level+1,2*x+i,2*z+j) for i in range(2) for j in range(2)]
 
     def mesh(self, key):
-        a,b,c,d = self.bounds(key); e,f,g,h = TERRAIN_BOUNDS
-        # Include exact compatibility edges at every level; cut out the old ground.
-        xs = np.unique(np.r_[np.linspace(a,b,self.config.cells+1), [v for v in (e,f) if a < v < b]])
-        zs = np.unique(np.r_[np.linspace(c,d,self.config.cells+1), [v for v in (g,h) if c < v < d]])
+        a,b,c,d = self.bounds(key)
+        # Insert every retained ground edge, so exclusion is an exact partition
+        # at all levels rather than dropping triangles by an approximate mask.
+        footprints = self.compatibility.footprints
+        xs = np.unique(np.r_[np.linspace(a,b,self.config.cells+1),
+            [v for r in footprints for v in r[:2] if a < v < b]])
+        zs = np.unique(np.r_[np.linspace(c,d,self.config.cells+1),
+            [v for r in footprints for v in r[2:] if c < v < d]])
+        # Stable subgrid near infrastructure resolves grading even on the pinned
+        # root fallback; rows outside this compact neighborhood retain normal LOD.
+        radius = self.config.flat_clearance+self.config.blend_width*(1+self.config.transition_variation)+self.config.compatibility_join_width/4
+        detail_step = self.config.compatibility_cell_size
+        for e,f,g,h in footprints:
+            if f+radius < a or e-radius > b or h+radius < c or g-radius > d: continue
+            xs = np.unique(np.r_[xs,np.arange(np.ceil(max(a,e-radius)/detail_step)*detail_step,min(b,f+radius)+1e-8,detail_step)])
+            zs = np.unique(np.r_[zs,np.arange(np.ceil(max(c,g-radius)/detail_step)*detail_step,min(d,h+radius)+1e-8,detail_step)])
         x,z = np.meshgrid(xs,zs); y = self.heights(x,z); normal = self.normals(x,z)
         sun = np.array([-.4,.8,-.3]); sun /= np.linalg.norm(sun)
         light = .45+.55*np.maximum(normal@sun,0)
@@ -102,16 +127,17 @@ class Terrain:
         color = color*blend + np.array([.57,.48,.36])*(1-blend)
         vertices = np.concatenate((x[...,None],y[...,None],z[...,None],color),axis=-1).reshape(-1,6).tolist()
         indices = []; width = len(xs)
+        cx,cz = np.meshgrid((xs[:-1]+xs[1:])/2,(zs[:-1]+zs[1:])/2)
+        excluded = self.compatibility.contains(cx,cz,strict=True)
         for j in range(len(zs)-1):
             for i in range(len(xs)-1):
-                cx,cz = (xs[i]+xs[i+1])/2,(zs[j]+zs[j+1])/2
-                if e < cx < f and g < cz < h: continue
+                if excluded[j,i]: continue
                 k = j*width+i; indices.extend((k,k+width,k+1,k+1,k+width,k+width+1))
         edges = [list(range(width)), list(range((len(zs)-1)*width,len(zs)*width)), [j*width for j in range(len(zs))], [j*width+width-1 for j in range(len(zs))]]
         for edge in edges:
             for first,second in zip(edge,edge[1:]):
                 cx,cz = (vertices[first][0]+vertices[second][0])/2,(vertices[first][2]+vertices[second][2])/2
-                if e <= cx <= f and g <= cz <= h: continue
+                if self.compatibility.contains(cx,cz): continue
                 start = len(vertices)
                 for index in (first,second):
                     vertex = vertices[index].copy(); vertex[1] -= self.skirt_depth; vertices.append(vertex)

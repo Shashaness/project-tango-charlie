@@ -11,7 +11,7 @@ class World:
         from game.world_environment import WorldEnvironment
         self.environment = WorldEnvironment()
         from game.terrain import Terrain
-        self.terrain = Terrain(terrain_config)
+        self.terrain = Terrain(terrain_config, self.environment.protected_footprints)
         self.targets = [
             Target(1,  (0, 0, -1000)),
             Target(2,  (-500, 100, -1500), (50, 0, 0)),

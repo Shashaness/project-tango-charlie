@@ -64,7 +64,7 @@ class Renderer:
         self.environment_mesh = Mesh(self.world.environment.vertices)
         for warning in self.world.terrain.dataset.warnings:
             print('Terrain:', warning)
-        if self.world.terrain.enabled:
+        if self.world.terrain is not None:
             from engine.terrain_renderer import TerrainResources
             self.terrain_resources = TerrainResources(self.world.terrain)
         self.vehicle_mesh = self._create_vehicle_mesh()

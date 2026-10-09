@@ -139,12 +139,69 @@ existing world elevation zero, independent of this choice.
 
 ## Compatibility and queries
 
-The whole existing ground rectangle, X=[-9000,9000], Z=[-8000,10000], stays flat.
-Keeping this 18 × 18 km area avoids rebuilding existing city/runway meshes.
-Terrain patches insert the rectangle's exact edges into their sampling grids and
-omit every top triangle inside it. There is no second coplanar ground underneath
-the city or airport. Outside it, a 1500 m smoothstep blends source heights from
-zero. Unavailable exterior tile borders additionally fade to flat over 750 m.
+M20.4 replaces the old 18 × 18 km (324 km²) rectangle with the union of two
+compact infrastructure footprints, derived from the environment's emitted ground
+surfaces and airport structures:
+
+| Region | Ground footprint (X/Z meters) | Size |
+| --- | --- | --- |
+| City | X=[-750,750], Z=[-1050,450] | 1500 × 1500 m |
+| Airport | X=[-76,396], Z=[1194,3806] | 472 × 2612 m |
+
+City roads, parks, plazas and lots retain their original ground tiles. The airport
+envelope includes runway, taxiways, apron, hangars, tower, perimeter and enclosed
+access/yard ground. These are separate conservative envelopes, not a city-to-airport
+bounding rectangle. Their combined retained ground area is **3.483 km²**.
+The existing desert base is cropped to this union before ground triangulation;
+all 30,684 building/structure vertices and 1,117 non-desert infrastructure tiles
+were verified unchanged against the pre-M20.4 implementation.
+
+`CompatibilityMask` computes vectorized Euclidean distance to these footprints.
+A bounded smooth-min joins overlapping grading lobes, removing the sharp slope
+reversal where two nearest-footprint distances meet. It never increases distance
+or intrudes into protected infrastructure. The ground-mesh exclusion uses the
+exact original envelopes, independently of the rounded grading mask.
+
+Default flat clearance is **150 m** beyond infrastructure. Rounded buffers give
+approximately **5.45 km²** of flat protected ground, a reduction of about **98.3%**.
+Individual flat extents are approximately 1800 × 1800 m around the city and
+772 × 2912 m around the airport; the union is not a filled bounding rectangle.
+The 744 m infrastructure gap is graded where it is outside these buffers.
+
+Beyond clearance, quintic smoothstep blends the source height from zero to full
+natural elevation over **450 m**. It has zero first/second derivatives at both
+endpoints. Two low-frequency seeded sinusoidal terms vary grading width by at
+most ±15% (382.5–517.5 m), with nominal wavelength 1800 m. Only grading width
+varies; protected surfaces cannot be consumed by noise. The default 100 m join
+smoothing can extend influence by at most another 25 m for these two footprints.
+Total default influence is therefore at most about **693 m** outside infrastructure.
+Unavailable dataset exterior borders still fade to flat over 750 m; this is a
+separate missing-data rule, not an infrastructure compatibility zone.
+
+All dimensions are configurable on `TerrainConfig`:
+
+| Field | Default | Purpose |
+| --- | --- | --- |
+| `flat_clearance` | 150 m | Flat buffer outside infrastructure (0–500 m) |
+| `blend_width` | 450 m | Nominal grading distance (positive, at most 5000 m) |
+| `transition_variation` | 0.15 | Fractional low-frequency width variation (0–0.3) |
+| `transition_wavelength` | 1800 m | Nominal variation wavelength (1000–10000 m) |
+| `compatibility_seed` | 20 | Deterministic phase; independent of frame/LOD |
+| `compatibility_join_width` | 100 m | Smooth-min join range (0–200 m; zero disables) |
+| `compatibility_cell_size` | 50 m | Static transition sample lattice (25–100 m) |
+
+At every patch level, retained ground edges are inserted into the sampling grid.
+Cells inside the exact union are omitted, without dropping partially intersecting
+triangles. Terrain fills the rounded flat buffers and grading area. A fixed 50 m
+lattice near infrastructure resolves the smaller transition even in the pinned
+root fallback. All heights, colors and normals use the same compatibility field;
+there is no separate mesh-only deformation. Original ground tiles remain at Y=0,
+with stitched endpoints. Skirts are omitted on edges inside retained ground and
+continue covering LOD seams elsewhere. No second coplanar base is rendered.
+
+With no elevation files, the environment retains its compact ground and a single
+coarse static terrain patch fills the rest of the domain at Y=0. Missing-data
+fallback does not start mesh subdivision jobs each frame.
 
 ```python
 terrain = game.world.terrain
@@ -158,7 +215,7 @@ of visibility, patch cache, and rendered LOD. Normals use centered 10 m finite
 differences on the same field. Missing data returns flat world ground.
 
 **Terrain-aware collision is deferred.** Existing contact remains at Y=0 globally,
-including outside the compatibility rectangle. Aircraft can intersect rendered
+including outside the protected footprint union. Aircraft can intersect rendered
 hills and Battledroids can walk below them. A later milestone must wire the query
 API into contact, slope handling, and continuous collision without depending on
 render meshes. This milestone changes no contact or flight equations.
@@ -168,7 +225,7 @@ render meshes. This milestone changes no contact or flight equations.
 Each patch is addressed by `(level, x_index, z_index)` in a quadtree. Its bounds
 and children are computed without building meshes. The root spans the domain;
 default finest patches span 1 km with approximately 31.25 m sample spacing.
-Exact compatibility edges can add rows/columns. Coarse source resampling can
+Exact ground edges and the compact transition lattice add rows/columns. Coarse source resampling can
 alias small features; LOD does not change source-query fidelity.
 
 Selection refines nearby patches first using distance relative to patch size and
@@ -184,7 +241,7 @@ normals; there is no new lighting shader, vegetation, water, or material system.
 Skirts descend below patch outer edges to cover neighboring LOD differences.
 Their conservative depth is the domain's source elevation range plus 64 m.
 The range is scanned in bounded row chunks at startup, only for intersecting
-tiles. Skirts do not descend inside the compatibility zone.
+tiles. Skirts do not descend inside retained ground footprints.
 
 One CPU worker prepares meshes. At most eight tasks are pending and at most two
 meshes upload per rendered frame; the render thread creates/deletes all GL objects.
@@ -195,8 +252,12 @@ working set are both bounded by the cache size. Ancestors count toward this limi
 small caches may retain coarser fallback coverage. Close cancels queued jobs, joins
 the worker, deletes every cached VAO/VBO/EBO, and closes mapped source files.
 
-A full ordinary patch has about 2304 triangles including skirts. The 64-patch
-budget is roughly 147,456 triangles and at most 64 terrain draw calls, separate
+A patch away from infrastructure has about 2304 triangles including skirts.
+Patches intersecting the compact transition have extra samples; root and ancestor
+meshes can be larger. These rows remain static and count toward the existing
+bounded GPU patch cache. The 64-patch
+budget is roughly 147,456 triangles for ordinary patches, with additional static
+transition geometry near infrastructure, and at most 64 terrain draw calls, separate
 from the existing single city/environment draw. Compatibility clipping often
 reduces this. Cache limits bound GPU memory; the default is roughly 5–6 MiB for
 96 ordinary patches. These are estimates, not frame-rate guarantees. Startup
@@ -237,7 +298,9 @@ The GL tool creates a temporary
 its near, compatibility-boundary, and far captures require no dataset download.
 Inspect those captures for continuous seams and flat runway/city ground. For
 manual play, install a tile, start in atmosphere, use F4 to verify runway reset,
-and fly east past X=9000 or south past Z=10000 to reach the terrain transition.
+and fly east past X=900 near the city or past X=546 near the airport to reach
+the terrain transition. The GL tool also captures `TERRAIN_CITY_EDGE`,
+`TERRAIN_AIRPORT_EDGE`, and `TERRAIN_COMPACT_PLAN` views.
 Use H and compare low/near flight with high-altitude views. Collision outside the
 flat zone remains subject to the limitation above.
 
@@ -286,3 +349,39 @@ Files modified: `game/terrain.py`, `engine/terrain_renderer.py`, `engine/hud.py`
 The existing HGT loader, flight/contact code, city/runway geometry and TC167
 model were preserved. No commit, push, tag, dataset download, terrain collision
 integration, or new gameplay feature was performed.
+
+## M20.4 validation
+
+Eight compact compatibility tests pass, as do the fifteen existing terrain tests,
+twelve GeoTIFF tests and fifteen environment/runway tests. Full suite: **335 tests
+in 59.895 s; 333 pass and the same two pre-existing GLB assertions fail**
+(folded-wing bounds and positive imported scales). Physics assertions were not
+changed to accommodate terrain. `git diff --check` and compile checks pass.
+
+The final local-data OpenGL check passed three complete cycles with 32-bit depth
+and no GL errors or surviving checked handles, including VTOL, locomotion and
+transformation cases. Captures in `/tmp/m204-final` were visually inspected for
+compact city/airport grading, flat infrastructure, holes and surface artifacts.
+City-edge view: 36 patches / 106,952 triangles; airport-edge: 37 / 109,942;
+overhead compact plan: 26 / 82,442. GPU residency stayed within 96 patches.
+No new per-footprint draw calls or per-frame mesh generation were introduced.
+
+Local CPU measurements: root preparation approximately 30 ms, 24,712 triangles,
+646,392 bytes; one near-infrastructure fine patch approximately 7 ms, 3346
+triangles, 105,432 bytes; ordinary distant patch approximately 5 ms, 2304
+triangles, 59,928 bytes. Transition enrichment increases static mesh memory and
+triangle counts, particularly on coarse ancestor patches; cache counts and worker
+limits remain bounded. These timings are observations, not frame-rate guarantees.
+
+Known limits remain source-query interpolation, finite terrain domain, LOD popping
+and skirts, missing-data fallback, and global Y=0 collision. Mesh interpolation
+approximates the continuous mask between its samples. The conservative city and
+airport envelopes include their vacant internal lots/yards; they are not building
+collision footprints. No gameplay, aircraft/contact physics, or GLB changes.
+
+M20.4 files created: `game/terrain_compatibility.py`,
+`tests/test_terrain_compatibility.py`. Modified: `game/world_environment.py`,
+`game/terrain.py`, `game/world.py`, `engine/renderer.py`,
+`engine/terrain_renderer.py`, `tests/test_terrain.py`,
+`tests/test_world_environment.py`, `tools/check_transformation_gl.py`,
+`docs/TERRAIN_LOD.md`, and `docs/WORLD_ENVIRONMENT.md`. No commit, push, or tag.

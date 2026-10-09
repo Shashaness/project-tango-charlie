@@ -79,7 +79,7 @@ class EnvironmentTests(unittest.TestCase):
         self.assertTrue(np.all(bounds[:,0] >= x0) and np.all(bounds[:,1] <= x1))
         self.assertTrue(np.all(bounds[:,2] >= z0) and np.all(bounds[:,3] <= z1))
         area = np.sum((bounds[:,1]-bounds[:,0])*(bounds[:,3]-bounds[:,2]))
-        self.assertAlmostEqual(area, (x1-x0)*(z1-z0), places=4)
+        self.assertAlmostEqual(area, sum((b-a)*(d-c) for a,b,c,d in e.protected_footprints), places=4)
         # Strict positive-area intersections are forbidden, including markings,
         # connector intersections and paving/desert boundaries at the airport.
         for index, (left, right, near, far) in enumerate(bounds):
@@ -107,8 +107,9 @@ class EnvironmentTests(unittest.TestCase):
                 edges[edge] += 1
         x0, x1, z0, z1 = TERRAIN_BOUNDS
         for (a,b), count in edges.items():
-            boundary = ((a[0] == b[0] and a[0] in (x0,x1)) or
-                        (a[2] == b[2] and a[2] in (z0,z1)))
+            boundary = any(((a[0] == b[0] and a[0] in (left,right) and near <= a[2] <= far and near <= b[2] <= far) or
+                            (a[2] == b[2] and a[2] in (near,far) and left <= a[0] <= right and left <= b[0] <= right))
+                           for left,right,near,far in e.protected_footprints)
             self.assertEqual(count, 1 if boundary else 2, msg=f'open or duplicate edge {a}, {b}')
 
     def test_ground_rectangle_subtraction_and_pavement_materials(self):
@@ -128,7 +129,7 @@ class EnvironmentTests(unittest.TestCase):
         self.assertEqual(kind(0,2471),'marking')
         self.assertEqual(kind(99,2501),'taxiway')
         self.assertEqual(kind(225,2999),'apron')
-        self.assertEqual(kind(600,2001),'desert')
+        self.assertEqual(kind(350,2001),'desert')
         block = next(b for b in e.blocks if b.kind=='ordinary' and b.district=='outer')
         x,z = block.center
         self.assertEqual(kind(block.bounds[0]+1.13,z+.137),'sidewalk')

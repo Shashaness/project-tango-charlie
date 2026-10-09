@@ -15,7 +15,7 @@ class TerrainResources:
         self.cache[(0,0,0)] = mesh_factory(*terrain.mesh((0,0,0)))
 
     def update(self, position, view_projection=None):
-        desired = self.selector.select(position, view_projection)
+        desired = self.selector.select(position, view_projection) if self.terrain.enabled else [(0,0,0)]
         wanted = {(0,0,0)}
         for key in desired:
             level,x,z = key

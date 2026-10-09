@@ -22,7 +22,7 @@ class Runway:
 
 RUNWAY = Runway()
 GROUND_ELEVATION = PARAMETERS.ground_altitude
-TERRAIN_BOUNDS = (-9000., 9000., -8000., 10000.)  # xmin, xmax, zmin, zmax
+TERRAIN_BOUNDS = (-9000., 9000., -8000., 10000.)  # Legacy composition canvas; never rendered uncropped.
 BUILDING_PALETTE = (
     (.66, .65, .62),  # weathered light concrete
     (.51, .51, .49),  # medium concrete
@@ -101,6 +101,7 @@ class WorldEnvironment:
         self.blocks = []
         self.buildings = []
         self.vertices = []
+        self.infrastructure_footprints = {'city': [], 'airport': []}
         self.ground_surfaces = [GroundSurface(TERRAIN_BOUNDS, 'desert')]
         rng = np.random.default_rng(seed)
         self.layout = generate_layout(seed)
@@ -177,13 +178,29 @@ class WorldEnvironment:
         self.number(r.designation, rx, rz+r.length/2-95)
         self.number('18', rx, rz-r.length/2+95, reverse=True)
         for z in (2830, 3000, 3170):
-            self.box((300, GROUND_ELEVATION+12, z), (90, 24, 110), BUILDING_PALETTE[1])
-        self.box((180, GROUND_ELEVATION+18, 2700), (14, 36, 14), BUILDING_PALETTE[0])
-        self.box((180, GROUND_ELEVATION+39, 2700), (28, 8, 28), BUILDING_PALETTE[5])
+            self.box((300, GROUND_ELEVATION+12, z), (90, 24, 110), BUILDING_PALETTE[1], region='airport')
+        self.box((180, GROUND_ELEVATION+18, 2700), (14, 36, 14), BUILDING_PALETTE[0], region='airport')
+        self.box((180, GROUND_ELEVATION+39, 2700), (28, 8, 28), BUILDING_PALETTE[5], region='airport')
         for x in (-70, 390):
             self.surface((x, 2500), (12, 2600), 'perimeter')
         for z in (1200, 3800):
             self.surface((160, z), (460, 12), 'perimeter')
+        # Derive separate envelopes from actual emitted infrastructure, including
+        # airport structures. Keep ground only within their compact union.
+        def envelope(rectangles):
+            return (min(r[0] for r in rectangles),max(r[1] for r in rectangles),
+                    min(r[2] for r in rectangles),max(r[3] for r in rectangles))
+        self.city_footprint = envelope(self.infrastructure_footprints['city'])
+        self.airport_footprint = envelope(self.infrastructure_footprints['airport'])
+        self.protected_footprints = (self.city_footprint,self.airport_footprint)
+        compact = []
+        for tile in self.ground_surfaces:
+            for a,b,c,d in self.protected_footprints:
+                e,f,g,h = tile.bounds
+                bounds = (max(a,e),min(b,f),max(c,g),min(d,h))
+                if bounds[0] < bounds[1] and bounds[2] < bounds[3]:
+                    compact.append(replace(tile,bounds=bounds))
+        self.ground_surfaces = compact
         # Store the planar prefix for structural tests and GL validation.
         buildings = self.vertices
         self.vertices = []
@@ -241,11 +258,16 @@ class WorldEnvironment:
         """Compose colors on the CPU by cutting tiles, never by layering planes."""
         x, z = center; w, d = size
         bounds = tuple(round(float(v),2) for v in (x-w/2,x+w/2,z-d/2,z+d/2))
+        region = 'airport' if kind in ('runway','taxiway','apron','perimeter','marking') else 'city'
+        self.infrastructure_footprints[region].append(bounds)
         self.ground_surfaces = [piece for tile in self.ground_surfaces
                                 for piece in tile.subtract(bounds)]
         self.ground_surfaces.append(GroundSurface(bounds, kind))
 
-    def box(self, center, size, color, facade=False):
+    def box(self, center, size, color, facade=False, region=None):
+        if region is not None:
+            x,_,z = center; w,_,d = size
+            self.infrastructure_footprints[region].append((x-w/2,x+w/2,z-d/2,z+d/2))
         corners = np.array([np.asarray(center)+np.asarray(size)*np.array((x, y, z))/2
                             for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)])
         # Outward winding. Omit hidden undersides: no coplanar base/roof faces.
