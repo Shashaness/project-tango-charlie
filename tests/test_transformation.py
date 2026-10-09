@@ -112,7 +112,7 @@ class TransformationTests(unittest.TestCase):
             with self.assertRaises(ValueError):self.c.update(dt)
 
     def test_space_inertial_transformation_continues_physics(self):
-        g=Game(enemy_count=0);v=g.player_vehicle
+        g=Game(enemy_count=0);g.flight_controller.switch_space();v=g.player_vehicle
         v.velocity[:]=(140,12,-90);v.rotate(yaw=math.pi/2,roll=math.pi)
         vv=v.velocity.copy();basis=v.orientation.copy();position=v.position.copy()
         g.input.toggle_configuration=True;g.update(0);g.input.toggle_configuration=False
@@ -197,12 +197,13 @@ class TransformationTests(unittest.TestCase):
     def test_renderer_draws_one_canonical_model_in_every_mode(self):
         from engine.renderer import Renderer
         g=Game(enemy_count=0);r=Renderer(g.world,g.player_vehicle,g.camera)
-        r.shader=Mock();r.grid=Mock();r.mesh=Mock();r.hud=Mock();r._draw_combat_scene=Mock()
+        r.environment_mesh=Mock();r.shader=Mock();r.grid=Mock();r.mesh=Mock();r.hud=Mock();r._draw_combat_scene=Mock()
         r.fighter_resources=Mock();r.fighter_model=g.player_vehicle.transformation.model
         r.vehicle_mesh=Mock();r.vtol_mesh=Mock();r.battledroid_mesh=Mock()
-        with patch('engine.renderer.GL.glClear'):
+        with patch('engine.renderer.GL.glClear'), patch('engine.renderer.GL.glClearColor'):
             for mode in M:
                 g.player_vehicle.flight_state.mode=mode;r.render()
+        self.assertEqual(r.environment_mesh.draw.call_count,3)
         self.assertEqual(r.fighter_resources.draw.call_count,3)
         r.vehicle_mesh.draw.assert_not_called();r.vtol_mesh.draw.assert_not_called();r.battledroid_mesh.draw.assert_not_called()
 

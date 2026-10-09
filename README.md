@@ -40,6 +40,12 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
+M20 starts TC167 at rest on runway 36 in ATMOSPHERE/FIGHTER, facing the
+procedural city skyline. Hold Up to accelerate, then use a small S pitch input
+near 85–100 m/s to rotate. F4 resets to the runway from any configuration;
+F1/F2 retain SPACE and airborne atmospheric test resets. Buildings are scenery
+and do not collide. See [world layout, runway support and testing](docs/WORLD_ENVIRONMENT.md).
+
 On Windows, activate with `.venv\Scripts\activate` instead. An existing environment
 can be activated directly. A display and OpenGL 3.3 Core graphics driver are required.
 
@@ -1540,3 +1546,7 @@ transformation, orbit and cleanup checks pass. See
 [contact architecture, tuning and manual acceptance](docs/VTOL_GROUND.md).
 Selected custom model edits are preserved. M17 animation is unchanged; M19 is
 not implemented.
+
+M20.3 terrain accepts local user-supplied SRTM HGT tiles with bounded quadtree LOD.
+See [TERRAIN_LOD.md](docs/TERRAIN_LOD.md) for installation, geographic configuration,
+H diagnostics, synthetic validation, and the deferred terrain collision limitation.

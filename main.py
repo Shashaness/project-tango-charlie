@@ -23,6 +23,11 @@ def main():
                         help='start with one or two valid pre-acquired hostile missile launches')
     parser.add_argument('--defense-range', type=float, default=1000., help='preset launch distance, 250-3500 meters')
     parser.add_argument('--ai-ecm', action='store_true', help='enable ECM on alternating enemies')
+    parser.add_argument('--terrain-dir', help='directory of user-supplied uncompressed HGT tiles')
+    parser.add_argument('--terrain-origin', nargs=2, type=float, metavar=('LAT', 'LON'), default=(34.5,-111.5))
+    parser.add_argument('--terrain-offset', type=float, help='source EGM96 elevation assigned to world Y=0')
+    parser.add_argument('--terrain-budget', type=int, default=64)
+    parser.add_argument('--terrain-view-distance', type=float, default=16000.)
     args = parser.parse_args()
     if args.inspect_model:
         from engine.gltf_loader import load_glb
@@ -37,8 +42,17 @@ def main():
         parser.error('--defense-range must be between 250 and 3500 meters')
     parameters = replace(AI, guns_enabled=args.ai_weapons != 'none',
                          missiles_enabled=args.ai_weapons == 'all',ecm_enabled=args.ai_ecm)
+    from game.terrain import TerrainConfig
+    from pathlib import Path
+    try:
+        terrain_config = TerrainConfig(latitude=args.terrain_origin[0], longitude=args.terrain_origin[1],
+            elevation_offset=args.terrain_offset, budget=args.terrain_budget,
+            cache_size=max(96,args.terrain_budget+1), view_distance=args.terrain_view_distance,
+            **({'directory': Path(args.terrain_dir)} if args.terrain_dir else {}))
+    except ValueError as error:
+        parser.error(str(error))
     game = Game(title=PROJECT_TITLE, enemy_count=args.enemies, ai_parameters=parameters,
-                locomotion_animation=not args.no_locomotion_animation)
+                locomotion_animation=not args.no_locomotion_animation, terrain_config=terrain_config)
     if args.atmosphere:
         game.input.atmosphere_pressed = True
         game.update(0)

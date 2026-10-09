@@ -87,7 +87,7 @@ class PrototypeTests(TestCase):
         renderer.vtol_mesh=Mock();renderer.battledroid_mesh=Mock()
         renderer.fighter_resources=Mock();renderer.fighter_model=self.model
         renderer.hud=Mock();renderer._draw_combat_scene=Mock()
-        with patch('engine.renderer.GL.glClear'):
+        with patch('engine.renderer.GL.glClear'), patch('engine.renderer.GL.glClearColor'):
             renderer.render();renderer.fighter_resources.draw.assert_called_once()
             renderer.vehicle_mesh.draw.assert_not_called()
             vehicle.flight_state.mode=VehicleMode.VTOL;renderer.render()

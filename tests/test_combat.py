@@ -195,7 +195,8 @@ class RadarHUDTests(unittest.TestCase):
             self.assertTrue(np.isfinite(geometry).all());self.assertEqual(len(geometry)%3,0)
 
     def test_game_fires_destroys_and_auto_selects_without_touching_flight(self):
-        game=Game();game.input.fire_gun=True
+        game=Game();game.flight_controller.switch_space()
+        game.player_vehicle.position[:]=(0,0,3);game.input.fire_gun=True
         initial_position=game.player_vehicle.position.copy()
         for _ in range(75):game.update(1/60)
         self.assertFalse(game.world.targets[0].alive)

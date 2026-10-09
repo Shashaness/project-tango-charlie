@@ -29,6 +29,8 @@ class FlightController:
         self.battledroid = BattledroidController(vehicle,self.fcc)
         from engine.vtol_ground import VTOLGroundContact
         self.vtol_ground = VTOLGroundContact(vehicle,self.fcc)
+        from game.fighter_ground import FighterGroundContact
+        self.fighter_ground = FighterGroundContact(vehicle)
 
     def reset_atmosphere(self):
         self.battledroid.jump_remaining=0.
@@ -130,7 +132,8 @@ class FlightController:
     def _update_atmosphere(self, dt, controls):
         vehicle = self.vehicle
         if (vehicle.flight_state.status is FlightStatus.CRASHED or dt <= 0 or
-                (vehicle.flight_state.status is FlightStatus.GROUNDED and vehicle.flight_state.mode is not VehicleMode.VTOL)):
+                (vehicle.flight_state.status is FlightStatus.GROUNDED and
+                 vehicle.flight_state.mode is VehicleMode.FIGHTER and not self.fighter_ground.on_runway())):
             return
         steps = max(1, math.ceil(dt / MAX_STEP))
         step = dt / steps
@@ -138,6 +141,7 @@ class FlightController:
             current_forces = calculate_forces(vehicle)
             vtol = vehicle.flight_state.mode is VehicleMode.VTOL
             if vtol:self.vtol_ground.begin(step)
+            else:self.fighter_ground.begin()
             authority = 1.0 if vtol else control_authority(current_forces)
             pitch_rate = VTOL.pitch_rate_deg if vtol else PARAMETERS.pitch_authority_deg
             roll_rate = VTOL.roll_rate_deg if vtol else PARAMETERS.roll_authority_deg
@@ -161,11 +165,11 @@ class FlightController:
             # Midpoint force integration: drag depends on velocity, not a decay percentage.
             initial_forces = calculate_forces(vehicle, throttle=throttle, controls=command, vector=vector)
             initial_acceleration=(self.vtol_ground.acceleration(initial_forces,vehicle.velocity,step)
-                                  if vtol else initial_forces.total_force/PARAMETERS.mass)
+                                  if vtol else self.fighter_ground.acceleration(initial_forces,vehicle.velocity,step))
             midpoint_velocity = vehicle.velocity + initial_acceleration * step / 2
             midpoint_forces = calculate_forces(vehicle, throttle=throttle, velocity=midpoint_velocity, controls=command, vector=vector)
             vehicle.acceleration = (self.vtol_ground.acceleration(midpoint_forces,midpoint_velocity,step)
-                                    if vtol else midpoint_forces.total_force / PARAMETERS.mass)
+                                    if vtol else self.fighter_ground.acceleration(midpoint_forces,midpoint_velocity,step))
             vehicle.position += midpoint_velocity * step
             vehicle.velocity += vehicle.acceleration * step
             vehicle.rotate(**rotation)
@@ -174,6 +178,11 @@ class FlightController:
             if vtol:
                 self.vtol_ground.finish()
                 if vehicle.flight_state.status is FlightStatus.CRASHED:break
+            elif self.fighter_ground.on_runway():
+                self.fighter_ground.finish()
+                if vehicle.flight_state.status is FlightStatus.CRASHED:
+                    self.fcc.clear_hover()
+                    break
             elif vehicle.position[1] <= PARAMETERS.ground_altitude:
                 impact_speed = vehicle.speed
                 vehicle.position[1] = PARAMETERS.ground_altitude
@@ -181,11 +190,12 @@ class FlightController:
                                                else FlightStatus.GROUNDED)
                 vehicle.velocity[:] = 0
                 vehicle.acceleration[:] = 0
-                vehicle.pitch_rate = vehicle.yaw_rate = vehicle.roll_rate = 0.0
+                vehicle.pitch_rate = vehicle.yaw_rate = vehicle.roll_rate = 0.
                 vehicle.aerodynamics = AeroForces()
-                vehicle.engine_throttle = 0.0
+                vehicle.engine_throttle = 0.
                 self.fcc.clear_hover()
                 break
         if (vehicle.flight_state.status is FlightStatus.FLYING or
-                (vehicle.flight_state.mode is VehicleMode.VTOL and vehicle.flight_state.status is FlightStatus.GROUNDED)):
+                (vehicle.flight_state.status is FlightStatus.GROUNDED and
+                 (vehicle.flight_state.mode is VehicleMode.VTOL or self.fighter_ground.on_runway()))):
             vehicle.aerodynamics = calculate_forces(vehicle, throttle=vehicle.engine_throttle, controls=command)

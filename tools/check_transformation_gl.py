@@ -1,4 +1,4 @@
-"""Hidden-context M16 draw/cleanup smoke check, with optional PNG evidence.
+"""Hidden-context model/world draw and cleanup checks, with optional PNG evidence.
 
 Run from the project root: python -m tools.check_transformation_gl --output /tmp/m16
 Requires the same display/window-server access as the game. No gameplay changes.
@@ -7,6 +7,8 @@ import argparse
 from pathlib import Path
 import struct
 import zlib
+import tempfile
+import time
 import glfw
 import numpy as np
 from OpenGL import GL
@@ -28,9 +30,18 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path)
     parser.add_argument('--locomotion',action='store_true')
     parser.add_argument('--animation',action='store_true')
+    parser.add_argument('--world-environment',action='store_true')
+    parser.add_argument('--terrain-test',action='store_true',help='render locally generated synthetic HGT terrain')
     parser.add_argument('--vtol-ground',action='store_true');args=parser.parse_args()
     if args.output:args.output.mkdir(parents=True,exist_ok=True)
-    window=None;renderer=None
+    window=None;renderer=None;terrain_fixture=None;terrain_config=None
+    if args.terrain_test:
+        from game.terrain import TerrainConfig
+        terrain_fixture=tempfile.TemporaryDirectory(prefix='tc-synthetic-hgt-')
+        row,col=np.indices((1201,1201))
+        samples=(1000+650*np.sin(col/1200*8*np.pi)*np.sin(row/1200*8*np.pi)).astype('>i2')
+        samples.tofile(Path(terrain_fixture.name)/'N34W112.hgt')
+        terrain_config=TerrainConfig(directory=Path(terrain_fixture.name))
     try:
         if not glfw.init():raise RuntimeError('GLFW initialization failed')
         for key,value in ((glfw.CONTEXT_VERSION_MAJOR,3),(glfw.CONTEXT_VERSION_MINOR,3),
@@ -41,7 +52,7 @@ def main():
         if not window:raise RuntimeError('OpenGL context creation failed')
         glfw.make_context_current(window)
         for iteration in range(3):
-            game=Game(enemy_count=0);v=game.player_vehicle;c=v.transformation
+            game=Game(enemy_count=0,terrain_config=terrain_config);v=game.player_vehicle;c=v.transformation
             renderer=Renderer(game.world,v,game.camera,game.flight_controller.fcc,game.combat)
             renderer.initialize();renderer.resize(window,1280,720)
             handles=[(m.vao,m.vbo,m.ebo) for m in renderer.fighter_resources.meshes]
@@ -50,6 +61,65 @@ def main():
                 if GL.glGetError()!=GL.GL_NO_ERROR:raise RuntimeError('OpenGL error during '+label)
                 if args.output and iteration==0:capture(args.output/(label+'.png'))
                 glfw.swap_buffers(window)
+            if args.world_environment:
+                if not GL.glIsEnabled(GL.GL_DEPTH_TEST) or not GL.glGetBooleanv(GL.GL_DEPTH_WRITEMASK):
+                    raise RuntimeError('Environment requires depth testing and depth writes')
+                if GL.glGetIntegerv(GL.GL_DEPTH_FUNC) != GL.GL_LESS:
+                    raise RuntimeError('Unexpected scene depth comparison')
+                if iteration == 0:
+                    print('Environment depth bits:', int(GL.glGetFramebufferAttachmentParameteriv(
+                        GL.GL_DRAW_FRAMEBUFFER, GL.GL_DEPTH, GL.GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE)))
+                game.reset_runway();draw('WORLD_RUNWAY')
+                v.position[:] = (0,450,950)
+                game.camera.snap_to_vehicle();game.camera.follow(v,0)
+                draw('WORLD_SKYLINE')
+                v.position[:] = (58,10,-40)
+                game.camera.snap_to_vehicle();game.camera.follow(v,0)
+                draw('WORLD_STREET')
+                # Moving views expose distance-dependent striping that a single
+                # static near-ground screenshot can miss. Camera controls unchanged.
+                for label, origin in (('STREET', (58,10,-40)), ('ALTITUDE', (0,900,1200)),
+                                      ('AIRFIELD', (180,650,4100))):
+                    for sample in range(6):
+                        v.position[:] = np.asarray(origin)+(sample*.35,0.,-sample*2.)
+                        game.camera.snap_to_vehicle();game.camera.follow(v,0)
+                        draw('WORLD_MOVING_'+label+'_'+str(sample))
+                # Inspection-only top view: show authoritative blocks, corridors,
+                # park paths and district density without changing gameplay cameras.
+                game.camera.mode='COCKPIT'
+                game.camera.position[:]=(0,1600,-300)
+                game.camera.forward[:]=(0,-1,0)
+                game.camera.right[:]=(1,0,0)
+                game.camera.up[:]=(0,0,-1)
+                draw('WORLD_CITY_PLAN')
+                game.reset_runway()
+            if args.terrain_test:
+                from game.flight_state import Environment
+                v.flight_state.environment=Environment.ATMOSPHERE
+                game.camera.mode='COCKPIT'
+                renderer.show_axes=True
+                for label,position,forward in (
+                    ('TERRAIN_NEAR',(12000,1400,14000),(-.35,-.2,-1)),
+                    ('TERRAIN_BOUNDARY',(10500,800,5000),(-1,-.12,-.3)),
+                    ('TERRAIN_FAR',(0,14000,10000),(0,-1,-.4))):
+                    game.camera.position[:]=position
+                    direction=np.asarray(forward,float);direction/=np.linalg.norm(direction)
+                    right=np.cross(direction,[0,1,0]);right/=np.linalg.norm(right)
+                    game.camera.forward[:]=direction;game.camera.right[:]=right
+                    game.camera.up[:]=np.cross(right,direction)
+                    deadline=time.monotonic()+5
+                    while time.monotonic()<deadline:
+                        renderer.render()
+                        if not renderer.terrain_resources.pending:break
+                        time.sleep(.01)
+                    draw(label)
+                    stats=renderer.terrain_resources.stats
+                    if stats['patches']<1 or stats['patches']>terrain_config.budget:
+                        raise RuntimeError('Invalid terrain patch budget')
+                    if iteration==0:print(label,stats)
+                handles.extend((m.vao,m.vbo,m.ebo) for m in renderer.terrain_resources.cache.values())
+                renderer.show_axes=False
+                game.reset_runway()
             for mode in VehicleMode:
                 c.reset(mode);v.flight_state.mode=mode
                 game.camera.snap_to_vehicle();game.camera.follow(v,0)
@@ -157,5 +227,6 @@ def main():
         if renderer is not None:renderer.close()
         if window is not None:glfw.destroy_window(window)
         glfw.terminate()
+        if terrain_fixture is not None:terrain_fixture.cleanup()
 
 if __name__=='__main__':main()

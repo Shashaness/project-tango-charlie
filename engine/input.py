@@ -6,6 +6,7 @@ import glfw
 class Input:
     def __init__(self):
         self.space_pressed = self.atmosphere_pressed = self.reset_pressed = False
+        self.runway_pressed = False
         self._debug_down = set()
         self.dispense_flare = self.dispense_chaff = self.toggle_ecm = False
         self.select_radar = self.select_ir = False
@@ -42,8 +43,9 @@ class Input:
         self.toggle_camera = c_down and not self._c_down
         self.toggle_axes = h_down and not self._h_down
         self._c_down, self._h_down = c_down, h_down
-        debug_keys = {key for key in (glfw.KEY_F1, glfw.KEY_F2, glfw.KEY_R, glfw.KEY_G, glfw.KEY_F3, glfw.KEY_V, glfw.KEY_TAB, glfw.KEY_M, glfw.KEY_L, glfw.KEY_B, glfw.KEY_J, glfw.KEY_1, glfw.KEY_2, glfw.KEY_K)
+        debug_keys = {key for key in (glfw.KEY_F4, glfw.KEY_F1, glfw.KEY_F2, glfw.KEY_R, glfw.KEY_G, glfw.KEY_F3, glfw.KEY_V, glfw.KEY_TAB, glfw.KEY_M, glfw.KEY_L, glfw.KEY_B, glfw.KEY_J, glfw.KEY_1, glfw.KEY_2, glfw.KEY_K)
                       if glfw.get_key(window, key) == glfw.PRESS}
+        self.runway_pressed = glfw.KEY_F4 in debug_keys - self._debug_down
         self.space_pressed = glfw.KEY_F1 in debug_keys - self._debug_down
         self.atmosphere_pressed = glfw.KEY_F2 in debug_keys - self._debug_down
         self.reset_pressed = glfw.KEY_R in debug_keys - self._debug_down

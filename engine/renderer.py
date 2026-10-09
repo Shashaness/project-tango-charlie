@@ -39,6 +39,8 @@ class Renderer:
         self.force_vectors = None
         self.vehicle_axes = None
         self.show_axes = False
+        self.environment_mesh = None
+        self.terrain_resources = None
         self.grid = None
         self.drawable = True
 
@@ -59,6 +61,12 @@ class Renderer:
         self.shader = Shader(shader_dir / "basic.vert", shader_dir / "basic.frag")
         self.mesh = self._create_demo_cube()
         self.grid = self._create_reference_grid()
+        self.environment_mesh = Mesh(self.world.environment.vertices)
+        for warning in self.world.terrain.dataset.warnings:
+            print('Terrain:', warning)
+        if self.world.terrain.enabled:
+            from engine.terrain_renderer import TerrainResources
+            self.terrain_resources = TerrainResources(self.world.terrain)
         self.vehicle_mesh = self._create_vehicle_mesh()
         self.enemy_mesh = self._create_vehicle_mesh(hostile=True)
         self.vtol_mesh = self._create_vtol_mesh()
@@ -218,6 +226,8 @@ class Renderer:
     def render(self):
         if not self.drawable:
             return
+        atmosphere = self.vehicle.flight_state.environment is Environment.ATMOSPHERE
+        GL.glClearColor(*((.48,.72,.91,1.) if atmosphere else (.03,.07,.12,1.)))
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
         self.shader.use()
         self.shader.set_matrix("view", self.camera.view_matrix())
@@ -228,7 +238,17 @@ class Renderer:
             self.shader.set_matrix("model", model)
             self.mesh.draw()
         self.shader.set_matrix("model", np.eye(4, dtype=np.float32))
-        self.grid.draw()
+        self.hud.terrain_debug = None
+        if atmosphere:
+            self.environment_mesh.draw()
+            if self.terrain_resources is not None:
+                self.terrain_resources.update(self.camera.position, self.camera.projection_matrix() @ self.camera.view_matrix())
+                self.terrain_resources.draw()
+                self.hud.terrain_debug = self.terrain_resources.stats
+            else:
+                self.hud.terrain_debug = dict(lod='NONE',patches=0,triangles=0,agl=float(self.camera.position[1]),tiles=0)
+        else:
+            self.grid.draw()
         if self.camera.mode == "CHASE":
             self.shader.set_matrix("model", self.vehicle.model_matrix())
             if getattr(self.vehicle, "transformation", None) is not None and self.fighter_resources is not None:
@@ -360,13 +380,15 @@ class Renderer:
 
     def close(self):
         """Release GPU resources while the window's context is still current."""
+        if self.terrain_resources is not None:
+            self.terrain_resources.close(); self.terrain_resources = None
         if self.model_resources is not None:
             self.model_resources.close();self.model_resources=None
         if self.fighter_resources is not None:
             self.fighter_resources.close()
             self.fighter_resources = None
         self.hud.close()
-        for resource in ("battledroid_mesh", "enemy_mesh", "missile_mesh", "combat_lines", "target_mesh", "force_vectors", "vehicle_axes", "vtol_mesh", "vehicle_mesh"):
+        for resource in ("environment_mesh", "battledroid_mesh", "enemy_mesh", "missile_mesh", "combat_lines", "target_mesh", "force_vectors", "vehicle_axes", "vtol_mesh", "vehicle_mesh"):
             mesh = getattr(self, resource)
             if mesh is not None:
                 mesh.close()

@@ -25,12 +25,12 @@ from game.battledroid_animation import BattledroidAnimationController
 
 
 class Game:
-    def __init__(self, title=PROJECT_TITLE, width=1280, height=720, enemy_count=AI_ENEMY_COUNT, ai_parameters=AI, locomotion_animation=True):
+    def __init__(self, title=PROJECT_TITLE, width=1280, height=720, enemy_count=AI_ENEMY_COUNT, ai_parameters=AI, locomotion_animation=True, terrain_config=None):
         self.title = title
         self.width = width
         self.height = height
         self.input = Input()
-        self.world = World(enemy_count, ai_parameters)
+        self.world = World(enemy_count, ai_parameters, terrain_config)
         self.combat = CombatSystem()
         self.player_vehicle = PlayerVehicle()
         self.player_vehicle.unit_designation = PLAYER_UNIT_DESIGNATION
@@ -49,6 +49,48 @@ class Game:
         self.combat.radar.update(self.player_vehicle,self.world.targets,self.combat.gun)
         self.renderer = None
         self.show_axes = False
+        self.reset_runway()
+
+    def reset_runway(self):
+        """Authoritative development reset; no synthetic touchdown event."""
+        from game.world_environment import RUNWAY
+        from game.fighter_ground import clearance
+        from game.battledroid_physics import GroundContact
+        from game.flight_state import FlightStatus
+        from game.atmospheric_physics import calculate_forces
+        v = self.player_vehicle
+        self.flight_controller.reset_atmosphere()
+        v.transformation.reset(VehicleMode.FIGHTER)
+        v.transformation.duration = 0.
+        v.transformation._coordinate = 0.
+        v.transformation._direction = 1
+        v.forward[:] = RUNWAY.forward;v.right[:] = (1,0,0);v.up[:] = (0,1,0)
+        x,z = RUNWAY.spawn_xz
+        v.position[:] = (x,clearance(v),z)
+        v.velocity[:] = 0;v.acceleration[:] = 0
+        v.pitch_rate = v.yaw_rate = v.roll_rate = 0.
+        v.throttle = v.engine_throttle = v.thrust_vector = 0.
+        v.ground_contact = GroundContact()
+        v.flight_state.status = FlightStatus.GROUNDED
+        v.locomotion.clear_layer();v.animation.clear_layer()
+        enabled = v.locomotion.enabled
+        v.locomotion.__init__(v.transformation, enabled=enabled)
+        v.animation.__init__(v.locomotion)
+        v.aerodynamics = calculate_forces(v)
+        # Retain key edge tracking so held F4 triggers only once.
+        down = self.input._debug_down.copy()
+        self.input.__init__();self.input._debug_down = down
+        self.camera_input.drag = (0.,0.)
+        self.camera_input.scroll = 0.
+        self.camera_input.reset_pressed = self.camera_input.toggle_pressed = False
+        self.camera_input._last_cursor = None
+        self.flight_controller.fighter_ground.supported = False
+        self.flight_controller.vtol_ground.supported = False
+        self.camera.mode = self.camera.external_camera_mode = 'CHASE'
+        self.camera.reset_orbit();self.camera.snap_to_vehicle();self.camera.follow(v,0.)
+        self.combat.missile_fire_control.reset()
+        v.defenses.reset();self.world.countermeasures.clear()
+        self.world.spawn_enemies(Environment.ATMOSPHERE,v)
 
     def setup_defense_test(self, seeker_types, distance=1000.):
         """Startup-only reproducible incoming threats; normal launch and flight code.
@@ -155,7 +197,7 @@ class Game:
 
             print("Flight: W/S pitch down/up, A/D roll left/right, Q/E yaw left/right, "
                   "Up/Down throttle, Left/Right strafe, R/F up/down in SPACE, X space brake, F1 SPACE, F2 ATMOSPHERE, "
-                  "R Fighter reset / VTOL up, G cycle Fighter/VTOL/Battledroid, K Battledroid jump, 0 chase/dolly, Z/X VTOL vector, C camera, H debug, F3 SAS, V hover assist, TAB next target, M missile, 1/2 RADAR/IR, L flare, B chaff, J ECM, SPACEBAR gun, ESC quit")
+                  "R Fighter reset / VTOL up, G cycle Fighter/VTOL/Battledroid, K Battledroid jump, 0 chase/dolly, Z/X VTOL vector, C camera, H debug, F3 SAS, F4 runway reset, V hover assist, TAB next target, M missile, 1/2 RADAR/IR, L flare, B chaff, J ECM, SPACEBAR gun, ESC quit")
             next_title_time = 0.0
             last_time = glfw.get_time()
             while not glfw.window_should_close(window):
@@ -184,6 +226,9 @@ class Game:
 
     def update(self, dt):
         """Advance direct flight controls using elapsed seconds."""
+        if self.input.runway_pressed:
+            self.reset_runway()
+            return
         if self.input.toggle_camera:
             self.camera.toggle_mode()
         self.camera_input.apply(self.camera)

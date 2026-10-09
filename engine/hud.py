@@ -127,7 +127,7 @@ def instrument_groups(vehicle, fcc=None, debug=False):
     if (battledroid or vtol) and vehicle.ground_contact.hard_landing_time>0:
         warnings.append('HARD LANDING')
     if vehicle.flight_state.status is not FlightStatus.FLYING and not vehicle.is_grounded:
-        reset = 'F2 RESET' if vehicle.flight_state.mode in (VehicleMode.VTOL,VehicleMode.BATTLEDROID) else 'R RESET'
+        reset = 'F2 RESET' if vehicle.flight_state.mode in (VehicleMode.VTOL,VehicleMode.BATTLEDROID) else 'R RESET / F4 RUNWAY'
         warnings.append(vehicle.flight_state.status.name + ' - ' + reset)
     if fcc is not None and fcc.hover_assist_enabled and not fcc.hover_correction_active:
         warnings.append('HOV PILOT / LIMITED')
@@ -172,6 +172,7 @@ def instrument_labels(vehicle, fcc=None, debug=False):
 class HUD:
     def __init__(self):
         self.width, self.height = 1280, 720
+        self.terrain_debug = None
         self.mesh = None
 
     def initialize(self):
@@ -236,6 +237,9 @@ class HUD:
                             triangle((px,py), (px+scale,py+scale), (px,py+scale), color)
 
         groups = instrument_groups(vehicle, fcc, debug)
+        if debug and self.terrain_debug is not None:
+            t = self.terrain_debug
+            groups['debug'].extend([f"TERRAIN LOD {t['lod']} PATCH {t['patches']}", f"TRI {t['triangles']} AGL {t['agl']:.0f} HGT {t['tiles']}"])
         for row, label in enumerate(groups['left']):
             text(label, 12, self.height-12-row*8*scale)
         for row, label in enumerate(groups['right']):

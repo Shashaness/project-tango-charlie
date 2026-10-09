@@ -7,7 +7,11 @@ from game.flight_state import Environment
 
 
 class World:
-    def __init__(self, enemy_count=AI_ENEMY_COUNT, ai_parameters=AI):
+    def __init__(self, enemy_count=AI_ENEMY_COUNT, ai_parameters=AI, terrain_config=None):
+        from game.world_environment import WorldEnvironment
+        self.environment = WorldEnvironment()
+        from game.terrain import Terrain
+        self.terrain = Terrain(terrain_config)
         self.targets = [
             Target(1,  (0, 0, -1000)),
             Target(2,  (-500, 100, -1500), (50, 0, 0)),
