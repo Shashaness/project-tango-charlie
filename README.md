@@ -1547,6 +1547,7 @@ transformation, orbit and cleanup checks pass. See
 Selected custom model edits are preserved. M17 animation is unchanged; M19 is
 not implemented.
 
-M20.3 terrain accepts local user-supplied SRTM HGT tiles with bounded quadtree LOD.
+M20.3 terrain accepts local SRTM HGT and WGS84 GeoTIFF elevation tiles from
+project-root `hgt/`, with bounded raster caching and quadtree LOD.
 See [TERRAIN_LOD.md](docs/TERRAIN_LOD.md) for installation, geographic configuration,
 H diagnostics, synthetic validation, and the deferred terrain collision limitation.

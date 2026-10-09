@@ -13,6 +13,7 @@ bin/
 obj/
 out/
 dist/
+hgt/
 
 # C/C++ build artifacts
 *.o

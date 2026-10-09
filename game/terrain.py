@@ -3,13 +3,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from functools import lru_cache
 import numpy as np
-from engine.asset_paths import asset_path
-from game.hgt import HgtDataset, LocalProjection
+from engine.asset_paths import PROJECT_ROOT
+from game.hgt import LocalProjection
+from game.elevation import ElevationDataset
 from game.world_environment import TERRAIN_BOUNDS
 
 @dataclass(frozen=True)
 class TerrainConfig:
-    directory: Path = asset_path('terrain/hgt')
+    directory: Path = PROJECT_ROOT / 'hgt'
     latitude: float = 34.5
     longitude: float = -111.5
     elevation_offset: float | None = None
@@ -37,15 +38,14 @@ class Terrain:
     def __init__(self, config=None):
         self.config = config or TerrainConfig()
         self.projection = LocalProjection(self.config.latitude, self.config.longitude)
-        self.dataset = HgtDataset(self.config.directory)
+        self.dataset = ElevationDataset(self.config.directory)
         self.enabled = bool(self.dataset.paths)
         origin = float(self.dataset.sample(self.config.latitude, self.config.longitude))
         self.offset = self.config.elevation_offset if self.config.elevation_offset is not None else (origin if np.isfinite(origin) else 0.)
         half = self.config.side/2
         north,west = self.projection.to_geographic(-half,-half)
         south,east = self.projection.to_geographic(half,half)
-        keys = {key for key in self.dataset.paths if key[0] <= north and key[0]+1 >= south
-                and (west > east or (key[1] <= east and key[1]+1 >= west))}
+        keys = self.dataset.intersecting(south,west,north,east)
         low, high = self.dataset.elevation_range(keys)
         self.elevation_bounds = min(0., low-self.offset), max(0., high-self.offset)
         self.skirt_depth = self.elevation_bounds[1]-self.elevation_bounds[0]+64.
@@ -54,19 +54,7 @@ class Terrain:
         x, z = np.broadcast_arrays(np.asarray(x, float), np.asarray(z, float))
         lat, lon = self.projection.to_geographic(x, z)
         raw = np.nan_to_num(self.dataset.sample(lat, lon)-self.offset, nan=0.)
-        # Fade unavailable tile edges to flat ground rather than an abrupt data cliff.
-        coverage = np.zeros(x.shape)
-        for south,west in self.dataset.paths:
-            mask = (lat >= south) & (lat <= south+1) & (lon >= west) & (lon <= west+1)
-            fade = np.ones(x.shape)
-            for neighbor,distance in (((south,west-1),(lon-west)*self.projection.east_scale),
-                                      ((south,west+1),(west+1-lon)*self.projection.east_scale),
-                                      ((south-1,west),(lat-south)*self.projection.north_scale),
-                                      ((south+1,west),(south+1-lat)*self.projection.north_scale)):
-                if neighbor not in self.dataset.paths:
-                    fade = np.minimum(fade,np.clip(distance/750.,0,1))
-            fade = fade*fade*(3-2*fade)
-            coverage = np.maximum(coverage,np.where(mask,fade,0))
+        coverage = self.dataset.coverage_weight(lat,lon,self.projection.east_scale,self.projection.north_scale)
         return raw * self.compatibility_weight(x,z) * coverage
 
     def compatibility_weight(self, x, z):

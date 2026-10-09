@@ -3,13 +3,22 @@
 The terrain system adds geographically anchored desert terrain around the existing
 city and airport. It preserves their geometry, runway heading, F4 reset, flight
 physics, VTOL ground support, and Battledroid contact. No external dataset is
-included. Missing or malformed HGT files leave the existing environment usable.
+redistributed. Missing or malformed elevation files leave the existing environment usable.
 
 ## Data installation and format
 
-Put uncompressed user-supplied files in `assets/terrain/hgt/`, or supply another
-local directory with `--terrain-dir`. Nothing downloads data. Check the particular
-provider's attribution and redistribution terms before distributing its files.
+The default directory is project-root **`hgt/`**. Discover `.hgt`, `.tif`, and
+`.tiff` files there, case-insensitively, or select another local directory with
+`--terrain-dir`. The older `assets/terrain/hgt/` location remains usable by passing
+that path explicitly. Nothing downloads terrain data. The local `hgt/` directory
+is ignored by Git; check the provider's attribution and redistribution terms
+before distributing any dataset.
+
+`game/elevation.py` supplies a common `ElevationDataset` for both formats.
+Metadata indexing records geographic coverage and source characteristics without
+reading whole image arrays. Direct raster inspection raises descriptive errors
+for unsupported files; directory loading records them in `dataset.warnings`,
+skips those files, and the renderer prints those warnings at initialization.
 
 `game/hgt.py` accepts exactly 1201 × 1201 (2,884,802 bytes) and 3601 × 3601
 (25,934,402 bytes) samples, stored as big-endian **signed** int16. A filename such
@@ -23,16 +32,84 @@ weights. An entirely void footprint returns NaN. Exact sample coordinates are
 snapped within numerical roundoff so an exact void does not acquire spurious
 neighbor weights. Dataset borders use the first available tile in sorted filename
 order, including its shared edge. Missing/void game heights fall back to zero.
-The tile cache holds at most four memory mappings, under a sampling lock.
+The elevation cache holds at most four rasters, subject to a separate 128 MiB
+uncompressed-byte budget, under a sampling lock. Each raster is limited to 64 MiB;
+oversized rasters are rejected before mapping or decoding. Limits can be configured
+through `ElevationDataset(capacity=..., cache_bytes=..., max_tile_bytes=...)`.
+Uncompressed TIFFs and HGT files are memory-mapped. Supported DEFLATE TIFFs decode
+with one worker into temporary disk-backed mappings; eviction/close releases
+mappings. Range scans use 128-row chunks and only intersecting tiles. The byte
+budget bounds mapped raster size, not total process RSS: decoder working buffers,
+OS file cache, GPU resources, and mesh work also consume memory.
 
 SRTM geographic coordinates use WGS84, while elevations are meters above the
 EGM96 geoid. Source elevation is **not** an ellipsoidal height. See the
 [USGS/NASA SRTM user guide](https://lpdaac.usgs.gov/documents/179/SRTM_User_Guide_V3.pdf).
 No geoid-to-ellipsoid conversion is performed here.
 
+## GeoTIFF metadata and supported CRS
+
+The lightweight dependency **`tifffile>=2024.8.30`** is listed in
+`requirements.txt`. It reads TIFF metadata, preserves numeric sample values and
+byte order, and supports direct memory mapping without GDAL, rasterio, or pyproj.
+Install/update the existing environment with:
+
+```sh
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+See the [tifffile project](https://github.com/cgohlke/tifffile) and the
+[OGC GeoTIFF specification](https://docs.ogc.org/is/19-008r4/19-008r4.html).
+
+Supported GeoTIFFs contain one numeric elevation band and one image, with
+north-up **EPSG:4326 / WGS84 geographic coordinates in degrees**. Pixel scale and
+tiepoint tags define bounds and spacing; nonzero raster tiepoint coordinates are
+handled. An axis-aligned ModelTransformation matrix is also accepted. Filenames
+are arbitrary and never determine coverage. Projected CRSs, other geographic
+CRSs, rotated/sheared transforms, inconsistent georeferencing, multiband images,
+and unsupported vertical references are rejected explicitly. No reprojection is
+performed. Missing vertical metadata retains the user-supplied SRTM assumption of
+EGM96 elevations in meters; explicitly declared alternatives are rejected.
+
+Both RasterPixelIsPoint and RasterPixelIsArea are supported. Point rasters place
+the first sample at the tiepoint-derived origin and span `(width-1) × pixel_step`.
+Area rasters describe outer pixel edges and sample at half-pixel centers, spanning
+`width × pixel_step`. The reader handles north-to-south rows, distinct X/Y pixel
+sizes, and integer or floating-point elevations. GDAL_NODATA tag values, NaNs, and
+infinities are excluded from interpolation. Unlike HGT, a GeoTIFF's declared
+NoData marker is authoritative; -32768 remains valid when a different marker is
+specified. Valid corners are renormalized, and entirely invalid queries return
+NaN. Uncompressed and DEFLATE compression are supported; other codecs and
+floating-point prediction are rejected rather than adding imagecodecs.
+
+Point tiles share boundary samples. Area-tile boundary interpolation obtains
+neighboring center samples, including four-tile corners, before retrieving the
+current mapping; this remains safe even with a one-tile cache. Exterior missing
+neighbors use available corner weights and the existing fade to flat ground.
+Shared and partially shared geographic edges are detected from metadata rather
+than an integer filename grid. Internal connected edges do not fade to zero.
+Overlapping rasters use the first valid result in sorted filename order.
+
+Raster tiles supply one continuous queried height field to the existing quadtree;
+there is no mesh per GeoTIFF. Each patch's world-space footprint is generated once,
+so adjacent source tiles cannot create duplicated boundary surfaces. Existing
+patch skirts still handle changes in mesh LOD.
+
 ## Geographic configuration
 
-Example with a tile containing the default origin:
+The nine installed local tiles are automatically discovered. Their metadata shows
+3601² signed int16 point rasters, EPSG:4326, 1/3600° spacing, -32767 NoData, and
+uncompressed storage. Together they cover longitude [-112,-109] and latitude
+[33,36]. The geographic origin is unchanged at 34.5, -111.5; loading additional
+tiles does not enlarge the existing 32 km rendered domain or move the city.
+
+Start using the local data with the automatically sampled vertical offset:
+
+```sh
+.venv/bin/python main.py --atmosphere
+```
+
+Example using an explicit directory and offset:
 
 ```sh
 .venv/bin/python main.py --atmosphere --terrain-dir /path/to/hgt \
@@ -131,7 +208,7 @@ calling thread. Shutdown waits for the currently running bounded mesh task.
 
 Press existing **H** in atmosphere mode to show LOD range, active patch count,
 approximate rendered triangles, camera altitude above the queried terrain, and
-currently mapped HGT tile count. No control binding was added.
+currently mapped elevation tile count (`TILES`, either format). No control binding was added.
 
 ```sh
 .venv/bin/python -m unittest discover -s tests -q
@@ -139,7 +216,23 @@ currently mapped HGT tile count. No control binding was added.
   --world-environment --vtol-ground --locomotion --animation --output /tmp/m203-gl
 ```
 
-Tests synthesize standard-sized HGT files locally. The GL tool creates a temporary
+Additional GeoTIFF checks:
+
+```sh
+.venv/bin/python -m tools.check_transformation_gl --terrain-test \
+  --terrain-test-format geotiff --world-environment --vtol-ground \
+  --locomotion --animation --output /tmp/m203-geotiff-synthetic
+.venv/bin/python -m tools.check_transformation_gl --terrain-dir hgt \
+  --world-environment --vtol-ground --locomotion --animation \
+  --output /tmp/m203-geotiff-local
+```
+
+Tests synthesize standard-sized HGT files and small GeoTIFF fixtures locally.
+They do not require the nine user-supplied files. GeoTIFF cases cover metadata,
+byte order, negative/void/NaN elevations, area/point sampling, both tile-edge
+orientations, four-tile corners, mixed formats, unsupported CRS/transforms,
+DEFLATE decoding, count/byte limits, patch continuity and flat city/runway ground.
+The GL tool creates a temporary
 1201² hill field and repeats upload, drawing, and resource cleanup three times;
 its near, compatibility-boundary, and far captures require no dataset download.
 Inspect those captures for continuous seams and flat runway/city ground. For
@@ -152,7 +245,11 @@ Known limits: local projection approximation; fixed finite domain; no automatic
 streaming beyond that domain; linear height interpolation; no geomorphing (some
 LOD popping remains); skirts can show as vertical walls from below; conservative
 culling; data void fallback may create local depressions; startup range scanning;
-no terrain collision. No additional dependencies, gameplay, or model changes.
+no terrain collision. The amendment adds only tifffile as a dependency; no gameplay
+or model changes. GeoTIFF limitations additionally include the supported CRS,
+transform, band, compression, vertical-reference and per-raster size restrictions
+above. GeoTIFF GDAL band scale/offset metadata is not applied; install elevation
+rasters containing actual meter values, as these USGS SRTM files do.
 
 Validation on Apple M3 Pro (OpenGL 4.1 Metal, requested 3.3 Core): three complete
 terrain/model upload/draw/cleanup cycles passed with no GL errors. Synthetic near
@@ -165,7 +262,7 @@ A local synthetic benchmark measured approximately 11 ms for height-field startu
 56 patches after caching visibility/refinement calculations within each selection.
 These CPU timings exclude GL uploads, draw time, and disk-cold dataset access.
 
-Final automated results: 15 terrain tests passed. Full suite: 315 tests in 58.759 s,
+Initial HGT-only automated results: 15 terrain tests passed. Full suite: 315 tests in 58.759 s,
 313 passed and two pre-existing model assertions failed (folded-wing bounds and
 positive imported scales). Both assertions pass when using the committed GLB
 extracted to a temporary path; the working model was preserved. Final GL captures
@@ -176,6 +273,5 @@ M20.3 files created: `game/hgt.py`, `game/terrain.py`,
 `engine/terrain_renderer.py`, `tests/test_terrain.py`, `docs/TERRAIN_LOD.md`,
 and `assets/terrain/hgt/README.md`. Integration files modified: `game/world.py`,
 `engine/game.py`, `engine/renderer.py`, `engine/hud.py`, `main.py`,
-`tools/check_transformation_gl.py`, and `README.md`. Earlier milestone changes
-and existing user model/Blender changes remain in the workspace. No commit,
+`tools/check_transformation_gl.py`, and `README.md`. The original milestone preserved existing user model/Blender changes. No commit,
 push, tag, terrain collision integration, or new gameplay feature was performed.

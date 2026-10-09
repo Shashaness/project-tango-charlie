@@ -56,7 +56,7 @@ class TerrainResources:
         self.active = cover((0,0,0)) or []
         for key in self.active: self.cache.move_to_end(key)
         levels = [key[0] for key in self.active]
-        self.stats = dict(lod=f'{min(levels)}-{max(levels)}' if levels else 'NONE', patches=len(self.active), triangles=sum(self.cache[k].count//3 for k in self.active), agl=float(position[1])-self.terrain.height_at(position[0],position[2]), tiles=len(self.terrain.dataset.cache), cached=len(self.cache), pending=len(self.pending))
+        self.stats = dict(lod=f'{min(levels)}-{max(levels)}' if levels else 'NONE', patches=len(self.active), triangles=sum(self.cache[k].count//3 for k in self.active), agl=float(position[1])-self.terrain.height_at(position[0],position[2]), tiles=len(self.terrain.dataset.cache), raster_bytes=self.terrain.dataset.resident_bytes, cached=len(self.cache), pending=len(self.pending))
 
     def draw(self):
         for key in self.active: self.cache[key].draw()

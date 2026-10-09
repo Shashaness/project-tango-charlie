@@ -23,7 +23,7 @@ def main():
                         help='start with one or two valid pre-acquired hostile missile launches')
     parser.add_argument('--defense-range', type=float, default=1000., help='preset launch distance, 250-3500 meters')
     parser.add_argument('--ai-ecm', action='store_true', help='enable ECM on alternating enemies')
-    parser.add_argument('--terrain-dir', help='directory of user-supplied uncompressed HGT tiles')
+    parser.add_argument('--terrain-dir', help='directory of user-supplied HGT or WGS84 GeoTIFF elevation tiles')
     parser.add_argument('--terrain-origin', nargs=2, type=float, metavar=('LAT', 'LON'), default=(34.5,-111.5))
     parser.add_argument('--terrain-offset', type=float, help='source EGM96 elevation assigned to world Y=0')
     parser.add_argument('--terrain-budget', type=int, default=64)

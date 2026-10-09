@@ -239,7 +239,7 @@ class HUD:
         groups = instrument_groups(vehicle, fcc, debug)
         if debug and self.terrain_debug is not None:
             t = self.terrain_debug
-            groups['debug'].extend([f"TERRAIN LOD {t['lod']} PATCH {t['patches']}", f"TRI {t['triangles']} AGL {t['agl']:.0f} HGT {t['tiles']}"])
+            groups['debug'].extend([f"TERRAIN LOD {t['lod']} PATCH {t['patches']}", f"TRI {t['triangles']} AGL {t['agl']:.0f} TILES {t['tiles']}"])
         for row, label in enumerate(groups['left']):
             text(label, 12, self.height-12-row*8*scale)
         for row, label in enumerate(groups['right']):

@@ -31,16 +31,32 @@ def main():
     parser.add_argument('--locomotion',action='store_true')
     parser.add_argument('--animation',action='store_true')
     parser.add_argument('--world-environment',action='store_true')
-    parser.add_argument('--terrain-test',action='store_true',help='render locally generated synthetic HGT terrain')
+    parser.add_argument('--terrain-test',action='store_true',help='render locally generated synthetic elevation terrain')
+    parser.add_argument('--terrain-test-format',choices=('hgt','geotiff'),default='hgt')
+    parser.add_argument('--terrain-dir',type=Path,help='validate installed local HGT/GeoTIFF terrain')
     parser.add_argument('--vtol-ground',action='store_true');args=parser.parse_args()
     if args.output:args.output.mkdir(parents=True,exist_ok=True)
     window=None;renderer=None;terrain_fixture=None;terrain_config=None
-    if args.terrain_test:
+    if args.terrain_test and args.terrain_dir:parser.error('--terrain-test and --terrain-dir are mutually exclusive')
+    terrain_requested=args.terrain_test or args.terrain_dir is not None
+    if terrain_requested:
         from game.terrain import TerrainConfig
+    if args.terrain_dir is not None:
+        terrain_config=TerrainConfig(directory=args.terrain_dir)
+    if args.terrain_test:
         terrain_fixture=tempfile.TemporaryDirectory(prefix='tc-synthetic-hgt-')
         row,col=np.indices((1201,1201))
         samples=(1000+650*np.sin(col/1200*8*np.pi)*np.sin(row/1200*8*np.pi)).astype('>i2')
-        samples.tofile(Path(terrain_fixture.name)/'N34W112.hgt')
+        if args.terrain_test_format=='hgt':
+            samples.tofile(Path(terrain_fixture.name)/'N34W112.hgt')
+        else:
+            import tifffile
+            keys=(1,1,0,4,1024,0,1,2,1025,0,1,2,2048,0,1,4326,2054,0,1,9102)
+            tags=[(33550,'d',3,(1/1200,1/1200,0),False),
+                  (33922,'d',6,(0,0,0,-112,35,0),False),
+                  (34735,'H',len(keys),keys,False),(42113,'s',0,'-32767',False)]
+            tifffile.imwrite(Path(terrain_fixture.name)/'synthetic-elevation.tif',samples,
+                             metadata=None,extratags=tags)
         terrain_config=TerrainConfig(directory=Path(terrain_fixture.name))
     try:
         if not glfw.init():raise RuntimeError('GLFW initialization failed')
@@ -93,7 +109,8 @@ def main():
                 game.camera.up[:]=(0,0,-1)
                 draw('WORLD_CITY_PLAN')
                 game.reset_runway()
-            if args.terrain_test:
+            if terrain_requested:
+                if renderer.terrain_resources is None:raise RuntimeError("No supported elevation rasters found")
                 from game.flight_state import Environment
                 v.flight_state.environment=Environment.ATMOSPHERE
                 game.camera.mode='COCKPIT'
