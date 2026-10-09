@@ -251,27 +251,38 @@ transform, band, compression, vertical-reference and per-raster size restriction
 above. GeoTIFF GDAL band scale/offset metadata is not applied; install elevation
 rasters containing actual meter values, as these USGS SRTM files do.
 
-Validation on Apple M3 Pro (OpenGL 4.1 Metal, requested 3.3 Core): three complete
-terrain/model upload/draw/cleanup cycles passed with no GL errors. Synthetic near
-view: 33 patches, 70,384 triangles, levels 2–5; boundary: 12 patches, 23,808
-triangles; far: 8 patches, 15,696 triangles, level 2. Maximum observed residency
-was 84 patches, below the 96-patch cache limit. These are fixture-specific counts.
+## GeoTIFF amendment validation
 
-A local synthetic benchmark measured approximately 11 ms for height-field startup,
-5 ms to prepare a fine patch (59,928 bytes), and 1 ms for warmed selection of
-56 patches after caching visibility/refinement calculations within each selection.
-These CPU timings exclude GL uploads, draw time, and disk-cold dataset access.
+All 12 neighboring borders in the nine local 3601² USGS tiles were inspected;
+all 3601 valid shared samples on every border matched exactly (maximum height
+difference zero). Metadata indexing accepted all nine with no warnings. Cycling
+queries through all nine retained four mappings totaling 103,737,608 bytes
+(98.9 MiB), below the 128 MiB byte limit. The default rendered domain needs one
+25,934,402-byte mapping (24.7 MiB). The nine rasters remain local and unmodified.
 
-Initial HGT-only automated results: 15 terrain tests passed. Full suite: 315 tests in 58.759 s,
-313 passed and two pre-existing model assertions failed (folded-wing bounds and
-positive imported scales). Both assertions pass when using the committed GLB
-extracted to a temporary path; the working model was preserved. Final GL captures
-are in `/tmp/m203-gl-final`; all three complete validation cycles passed.
+Apple M3 Pro, OpenGL 4.1 Metal with a requested 3.3 Core context: synthetic
+GeoTIFF and local-data validation each passed three complete upload/draw/cleanup
+cycles, including world, VTOL, locomotion, animation, transformation, and resource
+checks. Local terrain near view: 34 patches / 72,688 triangles; boundary view:
+13 / 26,048; far view: 8 / 15,696. Maximum observed GPU patch residency was 87,
+below the unchanged 96-patch limit. Captures are in `/tmp/m203-geotiff-local`
+and `/tmp/m203-geotiff-synthetic`.
+
+A warmed local benchmark measured about 31 ms terrain startup, 10 ms preparation
+of one fine patch, and 0.4 ms per scalar height query. These are machine- and
+cache-dependent CPU observations, not frame-rate guarantees. Mesh preparation
+continues on the existing worker; no per-frame raster-wide scan was added.
+
+Automated tests: 12 synthetic GeoTIFF tests and all 15 existing terrain tests
+passed. Full suite: 327 tests in 60.879 s, 325 passed, with the same two existing
+GLB assertions failing (folded-wing bounds and positive imported scales).
+No physics or model assertions were relaxed. Compile checks and
 `git diff --check` passed.
 
-M20.3 files created: `game/hgt.py`, `game/terrain.py`,
-`engine/terrain_renderer.py`, `tests/test_terrain.py`, `docs/TERRAIN_LOD.md`,
-and `assets/terrain/hgt/README.md`. Integration files modified: `game/world.py`,
-`engine/game.py`, `engine/renderer.py`, `engine/hud.py`, `main.py`,
-`tools/check_transformation_gl.py`, and `README.md`. The original milestone preserved existing user model/Blender changes. No commit,
-push, tag, terrain collision integration, or new gameplay feature was performed.
+Amendment files created: `game/elevation.py`, `tests/test_geotiff.py`.
+Files modified: `game/terrain.py`, `engine/terrain_renderer.py`, `engine/hud.py`,
+`main.py`, `requirements.txt`, `tools/check_transformation_gl.py`, `README.md`,
+`assets/terrain/hgt/README.md`, and `docs/TERRAIN_LOD.md`.
+The existing HGT loader, flight/contact code, city/runway geometry and TC167
+model were preserved. No commit, push, tag, dataset download, terrain collision
+integration, or new gameplay feature was performed.
