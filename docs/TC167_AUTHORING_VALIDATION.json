@@ -1,0 +1,68 @@
+{
+  "version": "5.0.1",
+  "geometry_hierarchy_materials_preserved": true,
+  "actions": {
+    "BD_Idle": {
+      "slots": 36,
+      "curves": 360,
+      "keyframes": 17640,
+      "frames": [
+        1,
+        49
+      ]
+    },
+    "BD_Walk": {
+      "slots": 36,
+      "curves": 360,
+      "keyframes": 9000,
+      "frames": [
+        1,
+        25
+      ]
+    },
+    "BD_Run": {
+      "slots": 36,
+      "curves": 360,
+      "keyframes": 6840,
+      "frames": [
+        1,
+        19
+      ]
+    }
+  },
+  "fighter_restore_max_matrix_error": 0.0,
+  "canonical_idle_max_matrix_error": 5.722045899325678e-07,
+  "runtime_node_count": 68,
+  "glb_clips": {
+    "BD_Idle": {
+      "seconds": 2.0,
+      "channels": 108
+    },
+    "BD_Run": {
+      "seconds": 0.75,
+      "channels": 108
+    },
+    "BD_Walk": {
+      "seconds": 1.0,
+      "channels": 108
+    }
+  },
+  "original_files_sha256": {
+    "assets/blender/TC167.blend": "91b61a4f2c98b9c3e6cacb09e5076f0bc3d83c376cb7c5f531c2541cab545d27",
+    "assets/models/vehicles/tc167.glb": "4683bcc9547b1effdb2ec519bbd37c02e3fc3a1eca9f2d9c0fbd9940881fd19e"
+  },
+  "geometry_and_fighter_rest_exact": true,
+  "artist_key_edit_reexport_delta_m": [
+    0.0,
+    0.0,
+    0.010000000009313226
+  ],
+  "tests": {
+    "asset_tests": 7,
+    "total": 427,
+    "passed": 425,
+    "preexisting_failures": 2,
+    "seconds": 108.171
+  },
+  "original_files_unchanged": true
+}

@@ -1,19 +1,22 @@
 """Perfect-information selected-target tracking; radar never fires the gun."""
 
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
+
 import numpy as np
 
 from game.fire_control_solution import solve_intercept
 from game.gun import Gun
-from game.target_manager import TargetManager
 from game.missile_seeker import ECM_DETECTION_FACTOR
+from game.target_manager import TargetManager
 
 RADAR_MAX_RANGE = 10000.0  # m; independent of the gun's useful engagement range
 
 
 @dataclass(frozen=True)
 class RadarTrack:
+    """Selected-target range in meters, closure in m/s, relative vectors, and unit sight line."""
+
     target_id: int
     range: float
     closure: float  # positive means range decreasing
@@ -24,7 +27,14 @@ class RadarTrack:
 
 
 class FireControlRadar:
+    """Maintain perfect-information target tracking and fixed-gun intercept advice."""
+
     def __init__(self, max_range=RADAR_MAX_RANGE):
+        """Retain detection range and initialize empty track/intercept advice.
+
+        Args:
+            max_range: Maximum detection distance in meters.
+        """
         self.max_range = max_range
         self.target_manager = TargetManager()
         self.track = None
@@ -36,13 +46,28 @@ class FireControlRadar:
         return self.target_manager.current_target
 
     @current_target.setter
-    def current_target(self,target):
-        self.target_manager.current_target=target
+    def current_target(self, target):
+        self.target_manager.current_target = target
 
     def select_next(self, targets):
+        """Cycle the target manager through living aircraft targets.
+
+        Args:
+            targets: Ordered target collection.
+
+        Returns:
+            Selected target, or None when no valid targets remain.
+        """
         return self.target_manager.cycle(targets)
 
     def update(self, vehicle, targets, gun=None):
+        """Refresh the selected track and gun solution without firing weapons.
+
+        Args:
+            vehicle: Vehicle whose pose, motion, and configuration provide simulation state.
+            targets: Ordered target collection.
+            gun: Gun configuration used to evaluate the muzzle and engagement envelope.
+        """
         self.target_manager.refresh(targets)
         self.track = self.solution = None
         self.shoot = False
@@ -57,15 +82,31 @@ class FireControlRadar:
         if not math.isfinite(distance) or distance < 1e-8:
             return
         line_of_sight = relative_position / distance
-        closure = -float(np.dot(relative_velocity,line_of_sight))
-        self.track = RadarTrack(target.target_id,distance,closure,relative_position,relative_velocity,
-                                line_of_sight,distance<=self.max_range*(ECM_DETECTION_FACTOR if getattr(target,"ecm_enabled",False) else 1.0))
+        closure = -float(np.dot(relative_velocity, line_of_sight))
+        self.track = RadarTrack(
+            target.target_id,
+            distance,
+            closure,
+            relative_position,
+            relative_velocity,
+            line_of_sight,
+            distance
+            <= self.max_range
+            * (ECM_DETECTION_FACTOR if getattr(target, "ecm_enabled", False) else 1.0),
+        )
         if not self.track.in_range:
             return
-        self.solution = solve_intercept(muzzle_position,vehicle.velocity,target.position,target.velocity,
-                                        gun.parameters.muzzle_velocity)
+        self.solution = solve_intercept(
+            muzzle_position,
+            vehicle.velocity,
+            target.position,
+            target.velocity,
+            gun.parameters.muzzle_velocity,
+        )
         if self.solution is not None:
-            alignment = float(np.dot(vehicle.forward,self.solution.required_direction))
-            self.shoot = (distance<=gun.parameters.effective_range
-                          and self.solution.intercept_time<=gun.parameters.projectile_lifetime
-                          and alignment>=math.cos(math.radians(gun.parameters.firing_tolerance_deg)))
+            alignment = float(np.dot(vehicle.forward, self.solution.required_direction))
+            self.shoot = (
+                distance <= gun.parameters.effective_range
+                and self.solution.intercept_time <= gun.parameters.projectile_lifetime
+                and alignment >= math.cos(math.radians(gun.parameters.firing_tolerance_deg))
+            )

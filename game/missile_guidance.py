@@ -1,25 +1,47 @@
 """Vector PN normal acceleration: bounded forces, never velocity steering."""
 
 import math
+
 import numpy as np
 
 STANDARD_GRAVITY = 9.80665
 
 
-def proportional_navigation(relative_position, relative_velocity, missile_velocity,
-                            navigation_constant, max_g, max_turn_rate_deg):
-    distance_squared = float(np.dot(relative_position,relative_position))
+def proportional_navigation(
+    relative_position,
+    relative_velocity,
+    missile_velocity,
+    navigation_constant,
+    max_g,
+    max_turn_rate_deg,
+):
+    """Compute bounded normal acceleration from line-of-sight rotation and closure.
+
+    Args:
+        relative_position: Target-minus-observer world displacement in meters.
+        relative_velocity: Target-minus-observer world velocity in m/s.
+        missile_velocity: Missile world velocity in m/s.
+        navigation_constant: Dimensionless navigation gain.
+        max_g: Maximum guidance acceleration in standard-gravity units.
+        max_turn_rate_deg: Maximum turn rate in degrees/s.
+
+    Returns:
+        World guidance acceleration in m/s²; zero for degenerate range or speed.
+    """
+    distance_squared = float(np.dot(relative_position, relative_position))
     speed = float(np.linalg.norm(missile_velocity))
     if distance_squared < 1e-12 or speed < 1e-6:
         return np.zeros(3)
     line_of_sight = relative_position / math.sqrt(distance_squared)
-    closing_speed = max(0.0,-float(np.dot(relative_velocity,line_of_sight)))
-    los_angular_velocity = np.cross(relative_position,relative_velocity) / distance_squared
+    closing_speed = max(0.0, -float(np.dot(relative_velocity, line_of_sight)))
+    los_angular_velocity = np.cross(relative_position, relative_velocity) / distance_squared
     velocity_direction = missile_velocity / speed
-    acceleration = navigation_constant * closing_speed * np.cross(los_angular_velocity,velocity_direction)
+    acceleration = (
+        navigation_constant * closing_speed * np.cross(los_angular_velocity, velocity_direction)
+    )
     # PN acceleration is normal to motion: steering comes from acceleration integration.
-    maximum = min(max_g*STANDARD_GRAVITY,speed*math.radians(max_turn_rate_deg))
+    maximum = min(max_g * STANDARD_GRAVITY, speed * math.radians(max_turn_rate_deg))
     magnitude = float(np.linalg.norm(acceleration))
     if magnitude > maximum:
-        acceleration *= maximum/magnitude
+        acceleration *= maximum / magnitude
     return acceleration

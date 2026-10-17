@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+from test_vehicle import commands
 
 from engine.camera import Camera
 from engine.flight_controller import FlightController
@@ -11,69 +12,86 @@ from engine.hud import HUD, project_direction
 from engine.mesh import Mesh
 from game.flight_state import Environment, VehicleMode
 from game.player_vehicle import PlayerVehicle
-from test_vehicle import commands
 
 
 class InstrumentTests(unittest.TestCase):
+    """Instrument regression tests."""
+
     def test_compass_cardinals_from_orientation_in_all_modes(self):
+        """Verify compass cardinals from orientation in all modes."""
         from game.flight_instruments import heading_degrees
         from game.geography import GeographicFrame
         from game.hgt import LocalProjection
+
         for mode in VehicleMode:
-            for expected in (0,90,180,270):
-                vehicle=PlayerVehicle();vehicle.geographic_frame=GeographicFrame(LocalProjection())
-                vehicle.flight_state.mode=mode
-                vehicle.rotate(yaw=-np.radians(expected),pitch=0)
-                vehicle.rotate(pitch=.3)
-                vehicle.rotate(roll=.2)
-                vehicle.velocity[:]=(123,456,789)
-                self.assertAlmostEqual(heading_degrees(vehicle),expected,places=8)
-                self.assertTrue(np.isfinite(HUD().geometry(vehicle,Camera())).all())
+            for expected in (0, 90, 180, 270):
+                vehicle = PlayerVehicle()
+                vehicle.geographic_frame = GeographicFrame(LocalProjection())
+                vehicle.flight_state.mode = mode
+                vehicle.rotate(yaw=-np.radians(expected), pitch=0)
+                vehicle.rotate(pitch=0.3)
+                vehicle.rotate(roll=0.2)
+                vehicle.velocity[:] = (123, 456, 789)
+                self.assertAlmostEqual(heading_degrees(vehicle), expected, places=8)
+                self.assertTrue(np.isfinite(HUD().geometry(vehicle, Camera())).all())
 
     def test_compass_wrap_has_continuous_tick_motion(self):
         from engine.hud import compass_ticks
-        for before,after in ((359.9,.1),(.1,359.9)):
-            old=next(offset for offset,label in compass_ticks(before) if label=='N')
-            new=next(offset for offset,label in compass_ticks(after) if label=='N')
-            self.assertAlmostEqual(abs(new-old),.2)
-        labels={label for _,label in compass_ticks(45) if label is not None}
-        self.assertTrue({'N','030','060','E'}.issubset(labels))
+
+        for before, after in ((359.9, 0.1), (0.1, 359.9)):
+            old = next(offset for offset, label in compass_ticks(before) if label == "N")
+            new = next(offset for offset, label in compass_ticks(after) if label == "N")
+            self.assertAlmostEqual(abs(new - old), 0.2)
+        labels = {label for _, label in compass_ticks(45) if label is not None}
+        self.assertTrue({"N", "030", "060", "E"}.issubset(labels))
 
     def test_compass_camera_independent_and_translation_rebase(self):
+        """Verify compass camera independent and translation rebase."""
         from game.flight_instruments import heading_degrees
         from game.geography import GeographicFrame
         from game.hgt import LocalProjection
-        vehicle=PlayerVehicle((90000,1000,-60000))
-        vehicle.geographic_frame=GeographicFrame(LocalProjection())
+
+        vehicle = PlayerVehicle((90000, 1000, -60000))
+        vehicle.geographic_frame = GeographicFrame(LocalProjection())
         vehicle.rotate(yaw=-np.radians(123))
-        camera=Camera();hud=HUD()
-        before=hud.geometry(vehicle,camera)
-        camera.rotate(yaw=1,pitch=.5);camera.position[:]=(8000,7000,6000)
-        after=hud.geometry(vehicle,camera)
+        camera = Camera()
+        hud = HUD()
+        before = hud.geometry(vehicle, camera)
+        camera.rotate(yaw=1, pitch=0.5)
+        camera.position[:] = (8000, 7000, 6000)
+        after = hud.geometry(vehicle, camera)
+
         def compass(geometry):
-            return geometry[(geometry[:,0]>450)&(geometry[:,0]<830)&(geometry[:,1]>660)]
-        np.testing.assert_allclose(compass(before),compass(after))
-        geographic=vehicle.geographic_position
-        frame,_=vehicle.geographic_frame.rebase_plan(geographic)
-        vehicle.position[:]=frame.to_local(geographic);vehicle.geographic_frame=frame
-        self.assertAlmostEqual(heading_degrees(vehicle),123)
-        np.testing.assert_allclose(compass(before),compass(hud.geometry(vehicle,camera)))
+            return geometry[
+                (geometry[:, 0] > 450) & (geometry[:, 0] < 830) & (geometry[:, 1] > 660)
+            ]
+
+        np.testing.assert_allclose(compass(before), compass(after))
+        geographic = vehicle.geographic_position
+        frame, _ = vehicle.geographic_frame.rebase_plan(geographic)
+        vehicle.position[:] = frame.to_local(geographic)
+        vehicle.geographic_frame = frame
+        self.assertAlmostEqual(heading_degrees(vehicle), 123)
+        np.testing.assert_allclose(compass(before), compass(hud.geometry(vehicle, camera)))
 
     def test_compass_vertical_orientation_is_explicitly_undefined(self):
         from game.flight_instruments import heading_degrees
-        vehicle=PlayerVehicle();vehicle.rotate(pitch=np.pi/2)
+
+        vehicle = PlayerVehicle()
+        vehicle.rotate(pitch=np.pi / 2)
         self.assertIsNone(heading_degrees(vehicle))
-        self.assertTrue(np.isfinite(HUD().geometry(vehicle,Camera())).all())
+        self.assertTrue(np.isfinite(HUD().geometry(vehicle, Camera())).all())
 
     def test_throttle_persists_clamps_and_does_not_assign_velocity(self):
+        """Verify throttle persists clamps and does not assign velocity."""
         vehicle = PlayerVehicle()
         controller = FlightController(vehicle)
         controller.update(1, commands(thrust=1))
-        self.assertAlmostEqual(vehicle.throttle, .5)
+        self.assertAlmostEqual(vehicle.throttle, 0.5)
         controller.update(3, commands(thrust=1))
         self.assertEqual(vehicle.throttle, 1)
         speed = vehicle.speed
-        controller.update(.5, commands())
+        controller.update(0.5, commands())
         self.assertEqual(vehicle.throttle, 1)
         self.assertGreater(vehicle.speed, speed)
         controller.update(3, commands(thrust=-1))
@@ -83,8 +101,8 @@ class InstrumentTests(unittest.TestCase):
     def test_brake_decelerates_gradually(self):
         normal, brake = PlayerVehicle(), PlayerVehicle()
         normal.velocity[:] = brake.velocity[:] = (0, 0, -20)
-        FlightController(normal).update(.5, commands())
-        FlightController(brake).update(.5, commands(brake=True))
+        FlightController(normal).update(0.5, commands())
+        FlightController(brake).update(0.5, commands(brake=True))
         self.assertGreater(brake.speed, 0)
         self.assertLess(brake.speed, normal.speed)
 
@@ -94,76 +112,94 @@ class InstrumentTests(unittest.TestCase):
         self.assertIs(vehicle.flight_state.mode, VehicleMode.FIGHTER)
         for environment, mode in ((Environment.SPACE, VehicleMode.BATTLEDROID),):
             vehicle.flight_state.environment, vehicle.flight_state.mode = environment, mode
-            FlightController(vehicle).update(.1, commands())
-            self.assertIs(vehicle.flight_state.mode,VehicleMode.BATTLEDROID)
+            FlightController(vehicle).update(0.1, commands())
+            self.assertIs(vehicle.flight_state.mode, VehicleMode.BATTLEDROID)
 
     def test_marker_uses_camera_orientation_not_position(self):
+        """Verify marker uses camera orientation not position."""
         camera = Camera()
         self.assertIsNone(project_direction((0, 0, 0), camera, 800, 600))
         point, edge = project_direction((0, 0, -10), camera, 800, 600)
         np.testing.assert_allclose(point, (400, 300))
         self.assertFalse(edge)
         camera.position[:] = (1000, -2000, 100)
-        np.testing.assert_allclose(project_direction((0,0,-10), camera, 800,600)[0], point)
-        point, edge = project_direction((3,0,-10), camera,800,600)
-        self.assertGreater(point[0],400)
+        np.testing.assert_allclose(project_direction((0, 0, -10), camera, 800, 600)[0], point)
+        point, edge = project_direction((3, 0, -10), camera, 800, 600)
+        self.assertGreater(point[0], 400)
         self.assertFalse(edge)
-        camera.rotate(yaw=-np.pi/2)
-        point, edge = project_direction((0,0,-10), camera,800,600)
+        camera.rotate(yaw=-np.pi / 2)
+        point, edge = project_direction((0, 0, -10), camera, 800, 600)
         self.assertTrue(edge)
-        self.assertLess(point[0],400)
-        self.assertTrue(project_direction(-camera.forward*10,camera,800,600)[1])
+        self.assertLess(point[0], 400)
+        self.assertTrue(project_direction(-camera.forward * 10, camera, 800, 600)[1])
 
     def test_hud_resizes_and_only_reads_vehicle(self):
+        """Verify hud resizes and only reads vehicle."""
         hud, vehicle, camera = HUD(), PlayerVehicle(), Camera()
         vehicle.velocity[:] = (4, 2, -10)
-        snapshot = (vehicle.position.copy(), vehicle.velocity.copy(), vehicle.orientation.copy(), vehicle.throttle)
-        for width, height in ((800,600),(1600,900),(400,900)):
-            hud.resize(width,height)
-            camera.aspect = width/height
-            geometry = hud.geometry(vehicle,camera)
+        snapshot = (
+            vehicle.position.copy(),
+            vehicle.velocity.copy(),
+            vehicle.orientation.copy(),
+            vehicle.throttle,
+        )
+        for width, height in ((800, 600), (1600, 900), (400, 900)):
+            hud.resize(width, height)
+            camera.aspect = width / height
+            geometry = hud.geometry(vehicle, camera)
             self.assertTrue(np.isfinite(geometry).all())
-            self.assertEqual(geometry.shape[1],6)
-            self.assertEqual(len(geometry)%3,0)
-            center = geometry[:24,:2].mean(axis=0)
-            np.testing.assert_allclose(center,(width/2,height/2),atol=.001)
-        for actual, expected in zip((vehicle.position,vehicle.velocity,vehicle.orientation,vehicle.throttle),snapshot):
-            np.testing.assert_allclose(actual,expected)
-        self.assertIsNone(project_direction(vehicle.velocity,camera,0,0))
+            self.assertEqual(geometry.shape[1], 6)
+            self.assertEqual(len(geometry) % 3, 0)
+            center = geometry[:24, :2].mean(axis=0)
+            np.testing.assert_allclose(center, (width / 2, height / 2), atol=0.001)
+        for actual, expected in zip(
+            (vehicle.position, vehicle.velocity, vehicle.orientation, vehicle.throttle), snapshot
+        ):
+            np.testing.assert_allclose(actual, expected)
+        self.assertIsNone(project_direction(vehicle.velocity, camera, 0, 0))
 
     def test_hud_restores_depth_and_releases_buffer(self):
+        """Verify hud restores depth and releases buffer."""
         hud = HUD()
-        with patch('engine.hud.Mesh') as mesh, patch('engine.hud.GL') as gl:
-            gl.glIsEnabled.return_value=True
+        with patch("engine.hud.Mesh") as mesh, patch("engine.hud.GL") as gl:
+            gl.glIsEnabled.return_value = True
             hud.initialize()
-            hud.render(PlayerVehicle(),Camera(),MagicMock())
+            hud.render(PlayerVehicle(), Camera(), MagicMock())
             gl.glDisable.assert_called_once_with(gl.GL_DEPTH_TEST)
             gl.glEnable.assert_called_once_with(gl.GL_DEPTH_TEST)
-            self.assertGreater(mesh.return_value.count,0)
-            hud.close(); hud.close()
+            self.assertGreater(mesh.return_value.count, 0)
+            hud.close()
+            hud.close()
             mesh.return_value.close.assert_called_once()
 
     def test_normal_hud_geographic_coordinates_and_source_colors(self):
+        """Verify normal hud geographic coordinates and source colors."""
+        from engine.hud import HUD_COLOR, PROCEDURAL_COLOR
         from game.geography import GeographicFrame
         from game.hgt import LocalProjection
-        from engine.hud import HUD_COLOR, PROCEDURAL_COLOR
+
         hud, vehicle, camera = HUD(), PlayerVehicle(), Camera()
         vehicle.geographic_frame = GeographicFrame(LocalProjection())
         for mapped, expected in ((True, HUD_COLOR), (False, PROCEDURAL_COLOR)):
             hud.geographic_mapped = mapped
             geometry = hud.geometry(vehicle, camera, debug=False)
-            coordinates = geometry[(geometry[:,0]>500) & (geometry[:,0]<780)
-                                   & (geometry[:,1]>610) & (geometry[:,1]<655)]
+            coordinates = geometry[
+                (geometry[:, 0] > 500)
+                & (geometry[:, 0] < 780)
+                & (geometry[:, 1] > 610)
+                & (geometry[:, 1] < 655)
+            ]
             self.assertGreater(len(coordinates), 0)
-            np.testing.assert_allclose(coordinates[:,3:],
-                np.broadcast_to(expected, coordinates[:,3:].shape), atol=1e-6)
+            np.testing.assert_allclose(
+                coordinates[:, 3:], np.broadcast_to(expected, coordinates[:, 3:].shape), atol=1e-6
+            )
 
     def test_nonindexed_mesh_preserves_line_primitive(self):
-        with patch('engine.mesh.GL') as gl:
-            gl.GL_LINES=1
-            gl.glGenVertexArrays.return_value=7
-            gl.glGenBuffers.return_value=8
-            mesh=Mesh([(0,0,0,1,1,1),(1,0,0,1,1,1)],primitive=gl.GL_LINES)
+        with patch("engine.mesh.GL") as gl:
+            gl.GL_LINES = 1
+            gl.glGenVertexArrays.return_value = 7
+            gl.glGenBuffers.return_value = 8
+            mesh = Mesh([(0, 0, 0, 1, 1, 1), (1, 0, 0, 1, 1, 1)], primitive=gl.GL_LINES)
             mesh.draw()
-            gl.glDrawArrays.assert_called_once_with(gl.GL_LINES,0,2)
+            gl.glDrawArrays.assert_called_once_with(gl.GL_LINES, 0, 2)
             mesh.close()

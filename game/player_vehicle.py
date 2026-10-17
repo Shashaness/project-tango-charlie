@@ -3,19 +3,34 @@
 import numpy as np
 
 from engine.transform import Transform
-from game.flight_state import FlightState, VehicleMode, Environment, FlightStatus
-from game.battledroid_physics import GroundContact
 from game.atmospheric_physics import AeroForces
+from game.battledroid_physics import GroundContact
+from game.flight_state import Environment, FlightState, FlightStatus, VehicleMode
 
 
 class PlayerVehicle(Transform):
+    """Own shared rigid-body state, configuration, propulsion, contact, and defense telemetry."""
+
     @property
     def geographic_position(self):
-        frame=getattr(self,'geographic_frame',None)
+        """Express the current meter-space position in its geographic frame.
+
+        Returns:
+            GeographicPosition, or None when no geographic frame is attached.
+        """
+        frame = getattr(self, "geographic_frame", None)
         return None if frame is None else frame.from_local(self.position)
 
     def __init__(self, position=(0, 0, 3)):
+        """Initialize shared rigid-body motion, propulsion, airfield, and contact state.
+
+        Args:
+            position: XYZ position in meters.
+        """
         super().__init__(position)
+        from game.airfield_operations import AirfieldOperations
+
+        self.airfield = AirfieldOperations()
         self.flight_state = FlightState()
         self.ground_contact = GroundContact()
         self.aerodynamics = AeroForces()
@@ -28,13 +43,15 @@ class PlayerVehicle(Transform):
 
     @property
     def is_grounded(self):
-        return (self.flight_state.mode in (VehicleMode.VTOL,VehicleMode.BATTLEDROID)
-                and self.flight_state.environment is Environment.ATMOSPHERE
-                and self.flight_state.status is FlightStatus.GROUNDED)
+        return (
+            self.flight_state.mode in (VehicleMode.VTOL, VehicleMode.BATTLEDROID)
+            and self.flight_state.environment is Environment.ATMOSPHERE
+            and self.flight_state.status is FlightStatus.GROUNDED
+        )
 
     @property
     def heat_signature(self):
-        return .25+1.75*self.engine_throttle
+        return 0.25 + 1.75 * self.engine_throttle
 
     @property
     def radar_signature(self):
@@ -42,7 +59,7 @@ class PlayerVehicle(Transform):
 
     @property
     def ecm_enabled(self):
-        return getattr(getattr(self, 'defenses', None), 'ecm_enabled', False)
+        return getattr(getattr(self, "defenses", None), "ecm_enabled", False)
 
     @property
     def speed(self):

@@ -3,87 +3,146 @@
 Joint translations below are absolute parent-local values. Only changed nodes
 are listed; the approved binary and imported rest data are never modified.
 """
-from dataclasses import dataclass
+
 import math
+from dataclasses import dataclass
+
 from engine.quaternion import multiply
 from game.flight_state import VehicleMode
 
+
 @dataclass(frozen=True)
 class PoseTransform:
+    """Immutable local pose: meter translation, [x, y, z, w] rotation, and unitless scale."""
+
     translation: tuple
-    rotation: tuple = (0.,0.,0.,1.)
-    scale: tuple = (1.,1.,1.)
+    rotation: tuple = (0.0, 0.0, 0.0, 1.0)
+    scale: tuple = (1.0, 1.0, 1.0)
 
 
-def rotation(x=0,y=0,z=0):
-    def axis(index,degrees):
-        q=[0.,0.,0.,math.cos(math.radians(degrees)/2)]
-        q[index]=math.sin(math.radians(degrees)/2)
+def rotation(x=0, y=0, z=0):
+    """Compose local X/Y/Z degree rotations into a glTF quaternion.
+
+    Args:
+        x: Local X rotation in degrees.
+        y: Local Y rotation in degrees.
+        z: Local Z rotation in degrees.
+
+    Returns:
+        Quaternion tuple in [x, y, z, w] order.
+    """
+
+    def axis(index, degrees):
+        q = [0.0, 0.0, 0.0, math.cos(math.radians(degrees) / 2)]
+        q[index] = math.sin(math.radians(degrees) / 2)
         return q
-    return tuple(multiply(multiply(axis(0,x),axis(1,y)),axis(2,z)))
+
+    return tuple(multiply(multiply(axis(0, x), axis(1, y)), axis(2, z)))
+
 
 FIGHTER_POSE = {}
 VTOL_POSE = {}
 BATTLEDROID_POSE = {
     # Visual-only root datum: native-length legs keep soles at physical -3.2 m.
-    'TC167Root': PoseTransform((0,3.2873,0)),
-    'Fuselage': PoseTransform((0,1.3,0),rotation(x=-90)),
-    'FuselageSurface1': PoseTransform((0,0,0),scale=(.85,.85,.38)),
-    'Nose': PoseTransform((0,-1.4,1),rotation(x=180),(.8,.8,.8)),
-    'Cockpit': PoseTransform((0,-.8,.3),rotation(x=90)),
-    'TorsoCore': PoseTransform((0,0,0)),
-    'Head': PoseTransform((0,-.05,2.6)),
-    'VerticalTail': PoseTransform((0,1.8,-1.8),rotation(x=-90)),
+    "TC167Root": PoseTransform((0, 3.2873, 0)),
+    "Fuselage": PoseTransform((0, 1.3, 0), rotation(x=-90)),
+    "FuselageSurface1": PoseTransform((0, 0, 0), scale=(0.85, 0.85, 0.38)),
+    "Nose": PoseTransform((0, -1.4, 1), rotation(x=180), (0.8, 0.8, 0.8)),
+    "Cockpit": PoseTransform((0, -0.8, 0.3), rotation(x=90)),
+    "TorsoCore": PoseTransform((0, 0, 0)),
+    "Head": PoseTransform((0, -0.05, 2.6)),
+    "VerticalTail": PoseTransform((0, 1.8, -1.8), rotation(x=-90)),
 }
-for side,label in ((1,'Left'),(-1,'Right')):
-    VTOL_POSE.update({
-        label+'Intake': PoseTransform((side*1.6,-.1,2),rotation(x=-8)),
-        label+'UpperLeg': PoseTransform((0,0,-1.5),rotation(x=-57)),
-        label+'LowerLeg': PoseTransform((0,0,-2.6),rotation(x=-35)),
-        label+'Foot': PoseTransform((0,0,-2.6),rotation(x=-80)),
-        label+'Wing': PoseTransform((side*1.3,0,.5),rotation(z=side*8)),
-        label+'Tail': PoseTransform((side*.8,.3,-6),rotation(x=8)),
-    })
-    BATTLEDROID_POSE.update({
-        label+'Intake': PoseTransform((side*1.1,-.6,-.4),scale=(.85,1.,1.)),
-        label+'UpperLeg': PoseTransform((0,0,0),rotation(x=-94)),
-        label+'LowerLeg': PoseTransform((0,0,-2.6),rotation(x=8)),
-        label+'Foot': PoseTransform((0,0,-2.6),rotation(x=-94)),
-        label+'Wing': PoseTransform((side*1.25,2.8,-1.5+side*.1),rotation(x=-90,y=side*90)),
-        label+'Tail': PoseTransform((side*.8,1,-2),rotation(x=-75,y=side*65)),
-        label+'Shoulder': PoseTransform((side*1.5,2.,-.2)),
-        label+'UpperArm': PoseTransform((0,0,0),rotation(x=-90,y=-side*12),(.9,.9,.75)),
-        label+'Forearm': PoseTransform((0,0,-2),rotation(x=-20)),
-        label+'Hand': PoseTransform((0,0,-1.8),rotation()),
-    })
+for side, label in ((1, "Left"), (-1, "Right")):
+    VTOL_POSE.update(
+        {
+            label + "Intake": PoseTransform((side * 1.6, -0.1, 2), rotation(x=-8)),
+            label + "UpperLeg": PoseTransform((0, 0, -1.5), rotation(x=-57)),
+            label + "LowerLeg": PoseTransform((0, 0, -2.6), rotation(x=-35)),
+            label + "Foot": PoseTransform((0, 0, -2.6), rotation(x=-80)),
+            label + "Wing": PoseTransform((side * 1.3, 0, 0.5), rotation(z=side * 8)),
+            label + "Tail": PoseTransform((side * 0.8, 0.3, -6), rotation(x=8)),
+        }
+    )
+    BATTLEDROID_POSE.update(
+        {
+            label + "Intake": PoseTransform((side * 1.1, -0.6, -0.4), scale=(0.85, 1.0, 1.0)),
+            label + "UpperLeg": PoseTransform((0, 0, 0), rotation(x=-94)),
+            label + "LowerLeg": PoseTransform((0, 0, -2.6), rotation(x=8)),
+            label + "Foot": PoseTransform((0, 0, -2.6), rotation(x=-94)),
+            label + "Wing": PoseTransform(
+                (side * 1.25, 2.8, -1.5 + side * 0.1), rotation(x=-90, y=side * 90)
+            ),
+            label + "Tail": PoseTransform((side * 0.8, 1, -2), rotation(x=-75, y=side * 65)),
+            label + "Shoulder": PoseTransform((side * 1.5, 2.0, -0.2)),
+            label + "UpperArm": PoseTransform(
+                (0, 0, 0), rotation(x=-90, y=-side * 12), (0.9, 0.9, 0.75)
+            ),
+            label + "Forearm": PoseTransform((0, 0, -2), rotation(x=-20)),
+            label + "Hand": PoseTransform((0, 0, -1.8), rotation()),
+        }
+    )
 # Retain M16.2 intake-shell proportions without compressing their leg children.
-for name in ('LeftIntakeSurface8','LeftIntakeSurface9','LeftIntakeSurface10',
-             'RightIntakeSurface21','RightIntakeSurface22','RightIntakeSurface23'):
-    BATTLEDROID_POSE[name] = PoseTransform((0,0,0),scale=(1.,.448,1.))
+for name in (
+    "LeftIntakeSurface8",
+    "LeftIntakeSurface9",
+    "LeftIntakeSurface10",
+    "RightIntakeSurface21",
+    "RightIntakeSurface22",
+    "RightIntakeSurface23",
+):
+    BATTLEDROID_POSE[name] = PoseTransform((0, 0, 0), scale=(1.0, 0.448, 1.0))
 
-POSES = {VehicleMode.FIGHTER:FIGHTER_POSE,VehicleMode.VTOL:VTOL_POSE,
-         VehicleMode.BATTLEDROID:BATTLEDROID_POSE}
+POSES = {
+    VehicleMode.FIGHTER: FIGHTER_POSE,
+    VehicleMode.VTOL: VTOL_POSE,
+    VehicleMode.BATTLEDROID: BATTLEDROID_POSE,
+}
 # Engine collars remain attached to each foot throughout deployment; these
 # additional local rotations turn the nozzles downward in the deployed modes.
-ENGINE_ROTATIONS = {VehicleMode.FIGHTER:rotation(),VehicleMode.VTOL:rotation(x=90),
-                    VehicleMode.BATTLEDROID:rotation(x=90)}
+ENGINE_ROTATIONS = {
+    VehicleMode.FIGHTER: rotation(),
+    VehicleMode.VTOL: rotation(x=90),
+    VehicleMode.BATTLEDROID: rotation(x=90),
+}
 
-ENGINE_OFFSETS = {VehicleMode.FIGHTER:(0.,0.,0.),
-                  VehicleMode.VTOL:(0.,1.35,-1.7),
-                  VehicleMode.BATTLEDROID:(0.,1.46,-1.7)}
+ENGINE_OFFSETS = {
+    VehicleMode.FIGHTER: (0.0, 0.0, 0.0),
+    VehicleMode.VTOL: (0.0, 1.35, -1.7),
+    VehicleMode.BATTLEDROID: (0.0, 1.46, -1.7),
+}
 
 # Timing on the forward edges. Reversal evaluates the exact same curve backward.
 TIMINGS = {
-    'Intake':(0,.25), 'UpperLeg':(.1,.5), 'LowerLeg':(.25,.7),
-    'Foot':(.45,.85), 'Engine':(.45,.85), 'Wing':(.6,1), 'Tail':(.6,1),
+    "Intake": (0, 0.25),
+    "UpperLeg": (0.1, 0.5),
+    "LowerLeg": (0.25, 0.7),
+    "Foot": (0.45, 0.85),
+    "Engine": (0.45, 0.85),
+    "Wing": (0.6, 1),
+    "Tail": (0.6, 1),
 }
 BATTLEDROID_TIMINGS = {
-    'Intake':(.3,.9), 'UpperLeg':(.35,.8), 'LowerLeg':(.4,.85), 'Foot':(.55,.95),
-    'TC167Root':(.35,.9),
-    'Fuselage':(.1,.6), 'Nose':(.15,.65), 'Cockpit':(.2,.65), 'TorsoCore':(.1,.6),
-    'Shoulder':(.35,.7), 'UpperArm':(.4,.8), 'Forearm':(.5,.9), 'Hand':(.6,.95),
-    'Head':(.75,1), 'Wing':(.45,.95), 'Tail':(.3,.85), 'Engine':(.2,.6),
+    "Intake": (0.3, 0.9),
+    "UpperLeg": (0.35, 0.8),
+    "LowerLeg": (0.4, 0.85),
+    "Foot": (0.55, 0.95),
+    "TC167Root": (0.35, 0.9),
+    "Fuselage": (0.1, 0.6),
+    "Nose": (0.15, 0.65),
+    "Cockpit": (0.2, 0.65),
+    "TorsoCore": (0.1, 0.6),
+    "Shoulder": (0.35, 0.7),
+    "UpperArm": (0.4, 0.8),
+    "Forearm": (0.5, 0.9),
+    "Hand": (0.6, 0.95),
+    "Head": (0.75, 1),
+    "Wing": (0.45, 0.95),
+    "Tail": (0.3, 0.85),
+    "Engine": (0.2, 0.6),
 }
-DURATIONS = {(VehicleMode.FIGHTER,VehicleMode.VTOL):1.5,
-             (VehicleMode.VTOL,VehicleMode.BATTLEDROID):1.9}
-PHYSICS_SWITCH = .6
+DURATIONS = {
+    (VehicleMode.FIGHTER, VehicleMode.VTOL): 1.5,
+    (VehicleMode.VTOL, VehicleMode.BATTLEDROID): 1.9,
+}
+PHYSICS_SWITCH = 0.6

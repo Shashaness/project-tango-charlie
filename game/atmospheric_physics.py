@@ -1,7 +1,7 @@
 """Prototype SI-unit fighter forces; zero wind, constant density, no aero moments."""
 
-from dataclasses import dataclass, field
 import math
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -11,6 +11,8 @@ from game.vtol_physics import VTOL, engine_force, maneuver_force
 
 @dataclass(frozen=True)
 class AircraftParameters:
+    """Immutable fighter tuning in SI units; angle/rate fields ending in _deg use degrees."""
+
     mass: float = 6000.0  # kg
     wing_area: float = 30.0  # m²
     air_density: float = 1.225  # kg/m³
@@ -39,11 +41,18 @@ PARAMETERS = AircraftParameters()
 
 
 def zero_vector():
+    """Create an independent zero force vector.
+
+    Returns:
+        Three-component float64 zero array.
+    """
     return np.zeros(3, dtype=np.float64)
 
 
 @dataclass
 class AeroForces:
+    """Aerodynamic telemetry: speed in m/s, pressure in Pa, angles in radians, forces in N."""
+
     airspeed: float = 0.0
     dynamic_pressure: float = 0.0
     alpha: float = 0.0  # radians; positive when nose above flight path
@@ -59,31 +68,74 @@ class AeroForces:
 
     @property
     def total_force(self):
-        return self.lift_force + self.drag_force + self.thrust_force + self.gravity_force + self.maneuver_force
+        """Sum aerodynamic, propulsion, maneuvering, and gravitational forces.
+
+        Returns:
+            World force vector in newtons.
+        """
+        return (
+            self.lift_force
+            + self.drag_force
+            + self.thrust_force
+            + self.gravity_force
+            + self.maneuver_force
+        )
 
 
 def coefficients(alpha, parameters=PARAMETERS):
+    """Evaluate bounded lift, induced/stall drag, and post-stall lift effectiveness.
+
+    Args:
+        alpha: Angle of attack in radians.
+        parameters: Configuration parameters; defaults retain the simulation tuning.
+
+    Returns:
+        Dimensionless (lift coefficient, drag coefficient, stall effectiveness) tuple.
+    """
     stall_excess = max(0.0, abs(alpha) - math.radians(parameters.stall_angle_deg))
     width = math.radians(parameters.stall_decay_width_deg)
     # A wider decay retains useful lift in combat AoA without unbounded CL.
-    stall_effectiveness = math.exp(-(stall_excess / width) ** 2)
+    stall_effectiveness = math.exp(-((stall_excess / width) ** 2))
     linear_lift = parameters.lift_curve_slope * alpha
-    limited_lift = np.clip(linear_lift, -parameters.max_lift_coefficient, parameters.max_lift_coefficient)
+    limited_lift = np.clip(
+        linear_lift, -parameters.max_lift_coefficient, parameters.max_lift_coefficient
+    )
     lift_coefficient = float(limited_lift) * stall_effectiveness
-    drag_coefficient = (parameters.zero_lift_drag_coefficient
-                        + parameters.induced_drag_factor * lift_coefficient ** 2
-                        + parameters.stall_drag_coefficient * (1 - stall_effectiveness))
+    drag_coefficient = (
+        parameters.zero_lift_drag_coefficient
+        + parameters.induced_drag_factor * lift_coefficient**2
+        + parameters.stall_drag_coefficient * (1 - stall_effectiveness)
+    )
     return lift_coefficient, drag_coefficient, stall_effectiveness
 
 
-def calculate_forces(vehicle, throttle=None, velocity=None, parameters=PARAMETERS,
-                     controls=None, vector=None):
-    """Pure force evaluation. Incoming wind is opposite relative aircraft velocity."""
+def calculate_forces(
+    vehicle, throttle=None, velocity=None, parameters=PARAMETERS, controls=None, vector=None
+):
+    """Evaluate forces without mutating vehicle motion.
+
+    Args:
+        vehicle: Vehicle whose pose, motion, and configuration provide simulation state.
+        throttle: Engine throttle fraction in [0, 1].
+        velocity: World velocity vector in m/s.
+        parameters: Configuration parameters; defaults retain the simulation tuning.
+        controls: Pilot command fields; signed axes are normalized to [-1, 1].
+        vector: VTOL thrust-vector fraction; None uses the vehicle value.
+
+    Returns:
+        AeroForces with world-space forces in newtons and SI telemetry.
+    """
     if vehicle.flight_state.mode is VehicleMode.BATTLEDROID:
-        from game.battledroid_physics import forces
         from types import SimpleNamespace
-        return forces(vehicle, controls if controls is not None else SimpleNamespace(strafe=0.,lift=0.),
-                      throttle=throttle,velocity=velocity)
+
+        from game.battledroid_physics import forces
+
+        return forces(
+            vehicle,
+            controls if controls is not None else SimpleNamespace(strafe=0.0, lift=0.0),
+            throttle=throttle,
+            velocity=velocity,
+        )
     air_velocity = vehicle.velocity if velocity is None else np.asarray(velocity, dtype=float)
     if not np.isfinite(air_velocity).all() or not np.isfinite(vehicle.orientation).all():
         raise ValueError("Atmospheric state must be finite.")
@@ -96,13 +148,15 @@ def calculate_forces(vehicle, throttle=None, velocity=None, parameters=PARAMETER
         result.thrust_force = engine_force(vehicle, throttle, vector)
         result.maneuver_force = maneuver_force(vehicle, controls)
     else:
-        result.thrust_force = vehicle.forward * parameters.max_engine_thrust * np.clip(throttle, 0, 1)
+        result.thrust_force = (
+            vehicle.forward * parameters.max_engine_thrust * np.clip(throttle, 0, 1)
+        )
     result.gravity_force = np.array((0.0, -parameters.mass * parameters.gravity, 0.0))
     # Wind is currently zero. Later subtract world-space wind here.
     result.airspeed = float(np.linalg.norm(air_velocity))
     if not math.isfinite(result.airspeed):
         raise ValueError("Airspeed must be finite.")
-    result.dynamic_pressure = 0.5 * parameters.air_density * result.airspeed ** 2
+    result.dynamic_pressure = 0.5 * parameters.air_density * result.airspeed**2
     if result.airspeed < 1e-6:
         return result  # no undefined airflow normalization or aerodynamic forces
     local_forward = float(np.dot(air_velocity, vehicle.forward))
@@ -110,37 +164,83 @@ def calculate_forces(vehicle, throttle=None, velocity=None, parameters=PARAMETER
     local_right = float(np.dot(air_velocity, vehicle.right))
     result.alpha = math.atan2(-local_up, local_forward)
     result.beta = math.atan2(local_right, math.hypot(local_forward, local_up))
-    result.lift_coefficient, result.drag_coefficient, result.stall_effectiveness = coefficients(result.alpha, parameters)
+    result.lift_coefficient, result.drag_coefficient, result.stall_effectiveness = coefficients(
+        result.alpha, parameters
+    )
     if vtol:
         # Deployed structure retains a little wing lift but presents much more drag.
         result.lift_coefficient *= VTOL.wing_lift_factor
         result.drag_coefficient *= VTOL.drag_factor
+    else:
+        from game.airfield_operations import FlapState
+        from game.flight_state import Environment
+
+        if vehicle.flight_state.environment is Environment.ATMOSPHERE:
+            ops = vehicle.airfield
+            p = ops.parameters
+            result.drag_coefficient += p.gear_drag * ops.extension
+            if ops.flaps is FlapState.DEPLOYED:
+                rotation_benefit = float(
+                    np.clip(result.alpha / math.radians(p.flap_lift_alpha_deg), 0, 1)
+                )
+                result.lift_coefficient += (
+                    p.flap_lift * result.stall_effectiveness * rotation_benefit
+                )
+                result.drag_coefficient += p.flap_drag
     airflow_direction = air_velocity / result.airspeed
     # Span cross flight-path gives lift perpendicular to flow, banked with aircraft.
     lift_direction = np.cross(vehicle.right, airflow_direction)
     lift_length = float(np.linalg.norm(lift_direction))
     if lift_length > 1e-8:
         lift_direction /= lift_length
-        result.lift_force = lift_direction * result.dynamic_pressure * parameters.wing_area * result.lift_coefficient
-    result.drag_force = -airflow_direction * result.dynamic_pressure * parameters.wing_area * result.drag_coefficient
+        result.lift_force = (
+            lift_direction
+            * result.dynamic_pressure
+            * parameters.wing_area
+            * result.lift_coefficient
+        )
+    result.drag_force = (
+        -airflow_direction
+        * result.dynamic_pressure
+        * parameters.wing_area
+        * result.drag_coefficient
+    )
     if not np.isfinite(result.total_force).all():
         raise ValueError("Atmospheric forces became nonfinite.")
     return result
 
 
 def control_authority(forces, parameters=PARAMETERS):
-    reference_pressure = 0.5 * parameters.air_density * parameters.reference_airspeed ** 2
-    pressure_factor = 1.25 * forces.dynamic_pressure / (forces.dynamic_pressure + 0.25 * reference_pressure)
-    stall_factor = (parameters.minimum_stall_control_factor
-                    + (1 - parameters.minimum_stall_control_factor) * forces.stall_effectiveness)
+    """Scale fighter angular authority by airspeed and stall effectiveness.
+
+    Args:
+        forces: Force telemetry with world-space force vectors in newtons.
+        parameters: Configuration parameters; defaults retain the simulation tuning.
+
+    Returns:
+        Dimensionless bounded control-authority factor.
+    """
+    reference_pressure = 0.5 * parameters.air_density * parameters.reference_airspeed**2
+    pressure_factor = (
+        1.25 * forces.dynamic_pressure / (forces.dynamic_pressure + 0.25 * reference_pressure)
+    )
+    stall_factor = (
+        parameters.minimum_stall_control_factor
+        + (1 - parameters.minimum_stall_control_factor) * forces.stall_effectiveness
+    )
     return pressure_factor * stall_factor
 
 
 def reset_test_flight(vehicle, parameters=PARAMETERS):
-    """Trim a level flight path with slight nose-up incidence and balanced thrust."""
+    """Trim a level flight path with slight nose-up incidence and balanced thrust.
+
+    Args:
+        vehicle: Vehicle whose pose, motion, and configuration provide simulation state.
+        parameters: Configuration parameters; defaults retain the simulation tuning.
+    """
     from game.flight_state import Environment, FlightStatus, VehicleMode
 
-    q_area = 0.5 * parameters.air_density * parameters.test_airspeed ** 2 * parameters.wing_area
+    q_area = 0.5 * parameters.air_density * parameters.test_airspeed**2 * parameters.wing_area
     low, high = 0.0, math.radians(parameters.stall_angle_deg)
     for _ in range(50):
         alpha = (low + high) / 2
@@ -159,7 +259,9 @@ def reset_test_flight(vehicle, parameters=PARAMETERS):
     vehicle.up[:] = (0, 1, 0)
     vehicle.rotate(pitch=alpha)
     vehicle.velocity[:] = (0, 0, -parameters.test_airspeed)
-    vehicle.throttle = float(np.clip(q_area * cd / math.cos(alpha) / parameters.max_engine_thrust, 0, 1))
+    vehicle.throttle = float(
+        np.clip(q_area * cd / math.cos(alpha) / parameters.max_engine_thrust, 0, 1)
+    )
     vehicle.engine_throttle = vehicle.throttle
     vehicle.thrust_vector = 0.0
     vehicle.acceleration[:] = 0

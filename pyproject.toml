@@ -1,0 +1,18 @@
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["backups", "assets", "hgt"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+# Behavioral findings must be reviewed explicitly; only import layout is fixable.
+fixable = ["I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["engine", "game"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true

@@ -6,19 +6,29 @@ from unittest.mock import patch
 
 import numpy as np
 
-from engine.camera import Camera, CHASE_DISTANCE, CHASE_HEIGHT
-from engine.flight_controller import FlightController, DAMPING
+from engine.camera import CHASE_DISTANCE, CHASE_HEIGHT, Camera
+from engine.flight_controller import DAMPING, FlightController
 from engine.input import Input
 from game.player_vehicle import PlayerVehicle
 
 
 def commands(**changes):
+    """Create neutral normalized pilot commands with explicit test overrides.
+
+    Args:
+        **changes: Keyword overrides for the neutral pilot-command fixture.
+
+    Returns:
+        SimpleNamespace containing the command fields.
+    """
     values = dict(thrust=0, pitch=0, yaw=0, roll=0, lift=0, strafe=0, brake=False, vector_command=0)
     values.update(changes)
     return SimpleNamespace(**values)
 
 
 class VehicleTests(unittest.TestCase):
+    """Vehicle regression tests."""
+
     def test_turning_preserves_world_velocity_and_new_thrust_adds_sideways(self):
         vehicle = PlayerVehicle()
         vehicle.velocity[:] = (0, 0, -10)
@@ -26,7 +36,7 @@ class VehicleTests(unittest.TestCase):
         controller.update(1.5, commands(yaw=-1))
         np.testing.assert_allclose(vehicle.forward, (1, 0, 0), atol=1e-12)
         np.testing.assert_allclose(vehicle.velocity, (0, 0, -10 * np.exp(-DAMPING * 1.5)))
-        controller.update(.5, commands(thrust=1))
+        controller.update(0.5, commands(thrust=1))
         self.assertGreater(vehicle.velocity[0], 0)
         self.assertLess(vehicle.velocity[2], 0)
 
@@ -36,7 +46,7 @@ class VehicleTests(unittest.TestCase):
         FlightController(vehicle).update(5, commands())
         np.testing.assert_allclose(vehicle.up, (0, -1, 0), atol=1e-12)
         for _ in range(2000):
-            vehicle.rotate(pitch=.013, yaw=.021, roll=-.035)
+            vehicle.rotate(pitch=0.013, yaw=0.021, roll=-0.035)
         basis = vehicle.orientation
         np.testing.assert_allclose(basis.T @ basis, np.eye(3), atol=1e-12)
         self.assertAlmostEqual(np.linalg.det(basis), 1)
@@ -47,23 +57,25 @@ class VehicleTests(unittest.TestCase):
             vehicle = PlayerVehicle()
             controller = FlightController(vehicle)
             for _ in range(fps * 3):
-                controller.update(1 / fps, commands(thrust=1, yaw=.3, roll=.5, lift=.2))
+                controller.update(1 / fps, commands(thrust=1, yaw=0.3, roll=0.5, lift=0.2))
             results.append((vehicle.position.copy(), vehicle.velocity.copy(), vehicle.orientation))
         for result in results[1:]:
             for actual, expected in zip(result, results[0]):
-                np.testing.assert_allclose(actual, expected, atol=.001)
+                np.testing.assert_allclose(actual, expected, atol=0.001)
 
     def test_chase_offset_and_cockpit_do_not_modify_vehicle(self):
+        """Verify chase offset and cockpit do not modify vehicle."""
         vehicle = PlayerVehicle()
-        vehicle.rotate(pitch=.4, yaw=.8, roll=np.pi)
+        vehicle.rotate(pitch=0.4, yaw=0.8, roll=np.pi)
         camera = Camera()
         position, orientation = vehicle.position.copy(), vehicle.orientation.copy()
         camera.follow(vehicle, 0)
-        np.testing.assert_allclose(camera.position,
-                                   position - vehicle.forward * CHASE_DISTANCE + vehicle.up * CHASE_HEIGHT)
+        np.testing.assert_allclose(
+            camera.position, position - vehicle.forward * CHASE_DISTANCE + vehicle.up * CHASE_HEIGHT
+        )
         np.testing.assert_allclose(camera.orientation.T @ camera.orientation, np.eye(3), atol=1e-12)
         camera.toggle_mode()
-        camera.follow(vehicle, .1)
+        camera.follow(vehicle, 0.1)
         np.testing.assert_allclose(camera.position, position)
         np.testing.assert_allclose(camera.orientation, orientation)
         camera.rotate(yaw=1)
@@ -71,7 +83,7 @@ class VehicleTests(unittest.TestCase):
         np.testing.assert_allclose(vehicle.position, position)
         camera.toggle_mode()
         camera.follow(vehicle, 0)
-        self.assertEqual(camera.mode, 'CHASE')
+        self.assertEqual(camera.mode, "CHASE")
 
     def test_chase_smoothing_matches_elapsed_time_for_fixed_target(self):
         vehicle = PlayerVehicle()
@@ -86,10 +98,15 @@ class VehicleTests(unittest.TestCase):
         np.testing.assert_allclose(*results, atol=1e-12)
 
     def test_toggle_keys_require_release(self):
+        """Verify toggle keys require release."""
         import glfw
+
         controls = Input()
         held = {glfw.KEY_C, glfw.KEY_H}
-        with patch('engine.input.glfw.get_key', side_effect=lambda window, key: glfw.PRESS if key in held else glfw.RELEASE):
+        with patch(
+            "engine.input.glfw.get_key",
+            side_effect=lambda window, key: glfw.PRESS if key in held else glfw.RELEASE,
+        ):
             controls.poll(None)
             self.assertTrue(controls.toggle_camera and controls.toggle_axes)
             controls.poll(None)
@@ -101,5 +118,5 @@ class VehicleTests(unittest.TestCase):
             self.assertTrue(controls.toggle_camera and controls.toggle_axes)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

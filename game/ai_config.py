@@ -1,12 +1,16 @@
 """Milestone 11 tuning; these values never change player flight parameters."""
+
 from dataclasses import dataclass
 
 AI_ENEMY_COUNT = 4
 AI_GUNS_ENABLED = True
 AI_MISSILES_ENABLED = True
 
+
 @dataclass(frozen=True)
 class AIParameters:
+    """Immutable pilot tuning in SI units; angle fields ending in _deg use degrees."""
+
     ecm_enabled: bool = False
     target_speed: float = 160.0
     min_combat_speed: float = 85.0
@@ -25,5 +29,6 @@ class AIParameters:
     break_period: float = 3.0
     guns_enabled: bool = AI_GUNS_ENABLED
     missiles_enabled: bool = AI_MISSILES_ENABLED
+
 
 AI = AIParameters()

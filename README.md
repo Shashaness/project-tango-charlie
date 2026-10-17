@@ -51,6 +51,11 @@ can be activated directly. A display and OpenGL 3.3 Core graphics driver are req
 
 ## Coordinates, units, and controls
 
+For Blender-authored rigid-node clips, see the [M21 animation workflow](docs/BLENDER_GLTF_ANIMATION.md).
+Inspect exports with `python -m tools.inspect_glb_animations path/to/model.glb`.
+Use `--vehicle-model path/to/tc167-animated.glb` to load compatible TC167 clips,
+or `--no-gltf-animation` to keep the procedural backend.
+
 Right-handed coordinates: **+X right, +Y up, -Z forward**. One render unit is
 one meter. Simulation uses SI: position in meters, velocity in m/s,
 acceleration in m/s², mass in kg, force in N, pressure in Pa, time in seconds.
@@ -1595,3 +1600,27 @@ callback direction, limits, per-mode persistence, target/reversal transitions,
 frame-rate-independent smoothing, cockpit restoration and physics/model isolation
 are covered. The OpenGL checker validates three upload/animation/ground/cleanup
 cycles; captures are in `/tmp/chase-gl-final` for manual robot framing inspection.
+
+
+## M20.6 runway operations
+
+Atmospheric FIGHTER now supports timed operational gear, flaps, runway landing
+and rollout. Hold **6** for wheel brakes; **7** toggles flaps; **8** toggles or
+reverses landing gear. **F4** starts aligned on runway 36 with gear DOWN and
+flaps UP. Rotate using existing pitch controls; there is no automatic takeoff.
+The lower-right operations panel retains compass, geographic and radar layout.
+See [AIRFIELD_OPERATIONS.md](docs/AIRFIELD_OPERATIONS.md) for parameters, crash
+thresholds, missing wheel/strut assets and a complete manual circuit procedure.
+No GLB re-export or physics/terrain engine replacement is required.
+
+
+## Ground operations and hangar lifecycle
+
+Startup now places TC167 gear-down inside the open west-facing middle hangar.
+Use **Q/E** for physical nose-wheel steering while grounded; airborne yaw and
+W/S pitch are unchanged. Taxiways, aprons and suitable natural ground support
+wheels and brakes, with surface-dependent resistance. Runway departure alone
+no longer causes a crash. Static walls/buildings and severe terrain/contact
+conditions do. **F4** retains the direct runway reset. See
+[GROUND_OPERATIONS.md](docs/GROUND_OPERATIONS.md) for controls, parameters,
+collision limits, and the complete taxi/takeoff/landing/hangar procedure.

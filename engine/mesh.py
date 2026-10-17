@@ -7,7 +7,16 @@ from OpenGL import GL
 
 
 class Mesh:
+    """Own a VAO and buffers for interleaved position/color triangle geometry."""
+
     def __init__(self, vertices, indices=None, primitive=GL.GL_TRIANGLES):
+        """Upload vertices and optional indices using the current OpenGL context.
+
+        Args:
+            vertices: Interleaved XYZ position and RGB color rows.
+            indices: Optional triangle index array; None draws unindexed vertices.
+            primitive: OpenGL primitive type, defaulting to triangles.
+        """
         vertices = np.ascontiguousarray(vertices, dtype=np.float32)
         if vertices.ndim != 2 or vertices.shape[1] != 6 or not len(vertices):
             raise ValueError("Vertices must be a nonempty array of [x, y, z, r, g, b].")
@@ -24,23 +33,19 @@ class Mesh:
             self.vbo = GL.glGenBuffers(1)
             GL.glBindVertexArray(self.vao)
             GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self.vbo)
-            GL.glBufferData(
-                GL.GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL.GL_STATIC_DRAW
-            )
+            GL.glBufferData(GL.GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL.GL_STATIC_DRAW)
             # Six float32 values per vertex: position at byte 0, color at byte 12.
             stride = 6 * vertices.itemsize
             for location, offset in ((0, 0), (1, 3 * vertices.itemsize)):
                 GL.glEnableVertexAttribArray(location)
                 GL.glVertexAttribPointer(
-                    location, 3, GL.GL_FLOAT, GL.GL_FALSE,
-                    stride, ctypes.c_void_p(offset)
+                    location, 3, GL.GL_FLOAT, GL.GL_FALSE, stride, ctypes.c_void_p(offset)
                 )
             if indices is not None:
                 self.ebo = GL.glGenBuffers(1)
                 GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, self.ebo)
                 GL.glBufferData(
-                    GL.GL_ELEMENT_ARRAY_BUFFER, indices.nbytes,
-                    indices, GL.GL_STATIC_DRAW
+                    GL.GL_ELEMENT_ARRAY_BUFFER, indices.nbytes, indices, GL.GL_STATIC_DRAW
                 )
         except Exception:
             self.close()
@@ -51,16 +56,16 @@ class Mesh:
             GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
 
     def draw(self):
+        """Draw the uploaded triangle mesh with the current OpenGL context."""
         GL.glBindVertexArray(self.vao)
         if self.ebo:
-            GL.glDrawElements(
-                self.primitive, self.count, GL.GL_UNSIGNED_INT, ctypes.c_void_p(0)
-            )
+            GL.glDrawElements(self.primitive, self.count, GL.GL_UNSIGNED_INT, ctypes.c_void_p(0))
         else:
             GL.glDrawArrays(self.primitive, 0, self.count)
         GL.glBindVertexArray(0)
 
     def close(self):
+        """Delete the mesh buffers and vertex array with a current OpenGL context."""
         if self.ebo:
             GL.glDeleteBuffers(1, [self.ebo])
             self.ebo = 0

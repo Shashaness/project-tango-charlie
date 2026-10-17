@@ -1,3 +1,5 @@
+> Ground contact now uses the shared CPU terrain support and static obstacle service described in [GROUND_OPERATIONS.md](GROUND_OPERATIONS.md). Earlier milestone validation records below retain their original limitations.
+
 # M20.5 planetary terrain streaming foundation
 
 M20.5 replaces the fixed 32 km rendering boundary with a camera-following forest

@@ -1,3 +1,5 @@
+> Current ground operations sample the CPU terrain field through a bounded 32 m support lattice and handle static obstacles; see [GROUND_OPERATIONS.md](GROUND_OPERATIONS.md). Historical flat-collision limitations below describe earlier milestones.
+
 > M20.5 streaming and geographic registry are documented in [PLANETARY_WORLD.md](PLANETARY_WORLD.md). Historical validation sections below retain their milestone results.
 
 # M20.3 — SRTM terrain LOD foundation

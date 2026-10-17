@@ -7,7 +7,15 @@ from OpenGL import GL
 
 
 class Shader:
+    """Compile and own an OpenGL program and provide uniform setters."""
+
     def __init__(self, vertex_path, fragment_path):
+        """Compile shader sources and link a program using the current OpenGL context.
+
+        Args:
+            vertex_path: Path to the GLSL vertex shader source.
+            fragment_path: Path to the GLSL fragment shader source.
+        """
         self.program = 0
         shaders = []
         try:
@@ -30,9 +38,7 @@ class Shader:
             GL.glLinkProgram(self.program)
             if not GL.glGetProgramiv(self.program, GL.GL_LINK_STATUS):
                 log = GL.glGetProgramInfoLog(self.program)
-                raise RuntimeError(
-                    f"Shader link failed ({vertex_path}, {fragment_path}):\n{log}"
-                )
+                raise RuntimeError(f"Shader link failed ({vertex_path}, {fragment_path}):\n{log}")
         except Exception:
             self.close()
             raise
@@ -44,10 +50,16 @@ class Shader:
                 GL.glDeleteShader(shader)
 
     def use(self):
+        """Bind this program in the current OpenGL context."""
         GL.glUseProgram(self.program)
 
     def set_matrix(self, name, matrix):
-        """Upload a mathematical row-major NumPy matrix to the active program."""
+        """Upload a mathematical row-major NumPy matrix to the active program.
+
+        Args:
+            name: Model node or state name.
+            matrix: Affine 4x4 transform in mathematical column-vector convention.
+        """
         location = GL.glGetUniformLocation(self.program, name)
         if location == -1:
             raise ValueError(f"Matrix uniform {name!r} was not found in the shader.")
@@ -55,11 +67,10 @@ class Shader:
         if matrix.shape != (4, 4):
             raise ValueError("Matrix uniforms must have shape (4, 4).")
         # OpenGL expects column-major memory. Transpose the storage, not the math.
-        GL.glUniformMatrix4fv(
-            location, 1, GL.GL_FALSE, np.ascontiguousarray(matrix.T)
-        )
+        GL.glUniformMatrix4fv(location, 1, GL.GL_FALSE, np.ascontiguousarray(matrix.T))
 
     def close(self):
+        """Delete this program using the current OpenGL context."""
         if self.program:
             GL.glDeleteProgram(self.program)
             self.program = 0

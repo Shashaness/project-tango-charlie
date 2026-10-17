@@ -1,51 +1,146 @@
 """Vectorized distance to the union of compact infrastructure footprints."""
+
 import numpy as np
 
+
 class CompatibilityMask:
-    def __init__(self, footprints, clearance=150., blend_width=450., variation=.15,
-                 wavelength=1800., seed=20, join_smoothing=100.):
-        self.footprints=tuple(tuple(float(v) for v in bounds) for bounds in footprints)
-        if not self.footprints or not np.isfinite(self.footprints).all() or any(a>=b or c>=d for a,b,c,d in self.footprints):
-            raise ValueError('Compatibility footprints must be nonempty rectangles')
-        if not np.isfinite([clearance,blend_width,variation,wavelength,join_smoothing]).all() or clearance < 0 or blend_width <= 0 or not 0 <= variation < 1 or wavelength <= 0 or join_smoothing < 0 or not isinstance(seed,(int,np.integer)):
-            raise ValueError('Invalid compatibility mask dimensions or seed')
-        self.clearance=clearance;self.blend_width=blend_width
-        self.variation=variation;self.wavelength=wavelength;self.seed=seed
-        self.join_smoothing=join_smoothing
+    """Blend terrain away from compact infrastructure footprints using smooth distance weights."""
+
+    def __init__(
+        self,
+        footprints,
+        clearance=150.0,
+        blend_width=450.0,
+        variation=0.15,
+        wavelength=1800.0,
+        seed=20,
+        join_smoothing=100.0,
+    ):
+        """Validate protected footprints and smooth transition parameters.
+
+        Args:
+            footprints: Protected horizontal rectangles (minimum X, maximum X, minimum Z,
+                maximum Z).
+            clearance: Protected-region clearance or ground support height in meters.
+            blend_width: Transition band width in meters.
+            variation: Dimensionless blend-width variation amplitude.
+            wavelength: Noise wavelength in meters.
+            seed: Integer seed for deterministic variation.
+            join_smoothing: Smooth-union distance in meters at footprint joins.
+        """
+        self.footprints = tuple(tuple(float(v) for v in bounds) for bounds in footprints)
+        if (
+            not self.footprints
+            or not np.isfinite(self.footprints).all()
+            or any(a >= b or c >= d for a, b, c, d in self.footprints)
+        ):
+            raise ValueError("Compatibility footprints must be nonempty rectangles")
+        if (
+            not np.isfinite([clearance, blend_width, variation, wavelength, join_smoothing]).all()
+            or clearance < 0
+            or blend_width <= 0
+            or not 0 <= variation < 1
+            or wavelength <= 0
+            or join_smoothing < 0
+            or not isinstance(seed, (int, np.integer))
+        ):
+            raise ValueError("Invalid compatibility mask dimensions or seed")
+        self.clearance = clearance
+        self.blend_width = blend_width
+        self.variation = variation
+        self.wavelength = wavelength
+        self.seed = seed
+        self.join_smoothing = join_smoothing
 
     def distance(self, x, z):
-        x,z=np.broadcast_arrays(np.asarray(x,float),np.asarray(z,float))
-        distance=np.full(x.shape,np.inf)
-        for a,b,c,d in self.footprints:
-            dx=np.maximum.reduce((a-x,x-b,np.zeros(x.shape)))
-            dz=np.maximum.reduce((c-z,z-d,np.zeros(z.shape)))
-            candidate=np.hypot(dx,dz)
+        """Compute distance to the rectangle union with optional smooth joins.
+
+        Args:
+            x: Local east-axis coordinate(s) in meters.
+            z: Local south-axis coordinate(s) in meters.
+
+        Returns:
+            Broadcast nonnegative distances in meters.
+        """
+        x, z = np.broadcast_arrays(np.asarray(x, float), np.asarray(z, float))
+        distance = np.full(x.shape, np.inf)
+        for a, b, c, d in self.footprints:
+            dx = np.maximum.reduce((a - x, x - b, np.zeros(x.shape)))
+            dz = np.maximum.reduce((c - z, z - d, np.zeros(z.shape)))
+            candidate = np.hypot(dx, dz)
             if self.join_smoothing > 0:
-                h=np.maximum(self.join_smoothing-np.abs(distance-candidate),0)/self.join_smoothing
-                distance=np.minimum(distance,candidate)-h*h*self.join_smoothing/4
-            else: distance=np.minimum(distance,candidate)
-        return np.maximum(distance,0)
+                h = (
+                    np.maximum(self.join_smoothing - np.abs(distance - candidate), 0)
+                    / self.join_smoothing
+                )
+                distance = np.minimum(distance, candidate) - h * h * self.join_smoothing / 4
+            else:
+                distance = np.minimum(distance, candidate)
+        return np.maximum(distance, 0)
 
     def contains(self, x, z, strict=False):
-        x,z=np.broadcast_arrays(np.asarray(x,float),np.asarray(z,float))
-        result=np.zeros(x.shape,dtype=bool)
-        for a,b,c,d in self.footprints:
-            result |= ((x>a)&(x<b)&(z>c)&(z<d) if strict else
-                       (x>=a)&(x<=b)&(z>=c)&(z<=d))
+        """Test horizontal points against the protected rectangle union.
+
+        Args:
+            x: Local east-axis coordinate(s) in meters.
+            z: Local south-axis coordinate(s) in meters.
+            strict: Whether to exclude rectangle boundary points.
+
+        Returns:
+            Broadcast boolean containment array.
+        """
+        x, z = np.broadcast_arrays(np.asarray(x, float), np.asarray(z, float))
+        result = np.zeros(x.shape, dtype=bool)
+        for a, b, c, d in self.footprints:
+            result |= (
+                (x > a) & (x < b) & (z > c) & (z < d)
+                if strict
+                else (x >= a) & (x <= b) & (z >= c) & (z <= d)
+            )
         return result
 
     def transition_width(self, x, z):
-        phase=(self.seed%997)*.173
-        frequency=2*np.pi/self.wavelength
-        noise=(np.sin(np.asarray(x)*frequency+phase)*np.cos(np.asarray(z)*frequency*.73-phase)
-               +.5*np.sin((np.asarray(x)+np.asarray(z))*.43*frequency+phase*.31))/1.5
-        return self.blend_width*(1+self.variation*noise)
+        """Vary the terrain blend width with deterministic low-frequency waves.
+
+        Args:
+            x: Local east-axis coordinate(s) in meters.
+            z: Local south-axis coordinate(s) in meters.
+
+        Returns:
+            Broadcast blend widths in meters.
+        """
+        phase = (self.seed % 997) * 0.173
+        frequency = 2 * np.pi / self.wavelength
+        noise = (
+            np.sin(np.asarray(x) * frequency + phase)
+            * np.cos(np.asarray(z) * frequency * 0.73 - phase)
+            + 0.5 * np.sin((np.asarray(x) + np.asarray(z)) * 0.43 * frequency + phase * 0.31)
+        ) / 1.5
+        return self.blend_width * (1 + self.variation * noise)
 
     def weight(self, x, z):
-        t=np.clip((self.distance(x,z)-self.clearance)/self.transition_width(x,z),0,1)
+        """Apply quintic smoothstep across the infrastructure transition band.
+
+        Args:
+            x: Local east-axis coordinate(s) in meters.
+            z: Local south-axis coordinate(s) in meters.
+
+        Returns:
+            Broadcast dimensionless terrain weights in [0, 1].
+        """
+        t = np.clip((self.distance(x, z) - self.clearance) / self.transition_width(x, z), 0, 1)
         # Quintic smoothstep: zero first and second derivatives at both ends.
-        return t*t*t*(10+t*(-15+6*t))
+        return t * t * t * (10 + t * (-15 + 6 * t))
 
     def excludes_patch(self, bounds):
-        a,b,c,d=bounds
-        return any(e<=a and b<=f and g<=c and d<=h for e,f,g,h in self.footprints)
+        """Check whether one protected footprint entirely covers the patch bounds.
+
+        Args:
+            bounds: Horizontal (minimum X, maximum X, minimum Z, maximum Z) rectangle in
+                meters.
+
+        Returns:
+            Whether the patch is fully inside a protected rectangle.
+        """
+        a, b, c, d = bounds
+        return any(e <= a and b <= f and g <= c and d <= h for e, f, g, h in self.footprints)
