@@ -72,6 +72,10 @@ class BattledroidLocomotionAnimator:
             for side in ("Left", "Right")
             for part in ("UpperLeg", "LowerLeg", "Foot", "UpperArm")
         ) + ("TorsoCore",)
+        self.authored = getattr(transformation, "authority", None) == "GLB"
+        if self.authored:
+            self.nodes = self.engines = {}
+            return
         self.nodes = {name: self.model.find_node(name) for name in self.names}
         self.engines = {side: self.model.find_node(side + "Engine") for side in ("Left", "Right")}
 
@@ -90,6 +94,9 @@ class BattledroidLocomotionAnimator:
         """
         if not math.isfinite(dt) or dt < 0:
             raise ValueError("Animation dt must be finite and nonnegative")
+        if self.authored:
+            self.transformation.locomotion(dt, vehicle, self.enabled)
+            return
         self.clear_layer()
         c = self.transformation
         # Horizontal body heading matches M13 locomotion, independent of tilt.

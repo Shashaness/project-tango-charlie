@@ -1,0 +1,133 @@
+{
+  "blender": "5.0.1",
+  "geometry_hierarchy_pivots_preserved": true,
+  "clips": {
+    "TC_FighterToVTOL": {
+      "duration": 1.5,
+      "nodes": 68,
+      "maximum_local_matrix_error": 0.0013197155977814345,
+      "endpoint_errors": [
+        0.0,
+        2.384185791015625e-07
+      ],
+      "keyframe_points": 2980,
+      "maximum_keys_per_curve": 154
+    },
+    "TC_VTOLToFighter": {
+      "duration": 1.5,
+      "nodes": 68,
+      "maximum_local_matrix_error": 0.0013197155977814345,
+      "endpoint_errors": [
+        2.384185791015625e-07,
+        0.0
+      ],
+      "keyframe_points": 2980,
+      "maximum_keys_per_curve": 154
+    },
+    "TC_VTOLToBattledroid": {
+      "duration": 1.9,
+      "nodes": 68,
+      "maximum_local_matrix_error": 0.0013090722813229316,
+      "endpoint_errors": [
+        2.384185791015625e-07,
+        5.245208740678464e-07
+      ],
+      "keyframe_points": 8685,
+      "maximum_keys_per_curve": 98
+    },
+    "TC_BattledroidToVTOL": {
+      "duration": 1.9,
+      "nodes": 68,
+      "maximum_local_matrix_error": 0.0013090722813229316,
+      "endpoint_errors": [
+        5.245208740678464e-07,
+        2.384185791015625e-07
+      ],
+      "keyframe_points": 8685,
+      "maximum_keys_per_curve": 98
+    }
+  },
+  "poses": {
+    "TC_Pose_Fighter": 0.0,
+    "TC_Pose_VTOL": 2.384185791015625e-07,
+    "TC_Pose_Battledroid": 5.245208740678464e-07
+  },
+  "exported_clips": {
+    "TC_BattledroidToVTOL": {
+      "duration": 1.899999976158142,
+      "nodes": 68,
+      "channels": 204,
+      "maximum_local_matrix_error": 0.0012811373802399384,
+      "endpoint_errors": [
+        3.3717483450142784e-07,
+        4.660328746242115e-07
+      ]
+    },
+    "TC_FighterToVTOL": {
+      "duration": 1.5,
+      "nodes": 68,
+      "channels": 204,
+      "maximum_local_matrix_error": 0.0012091953918659248,
+      "endpoint_errors": [
+        0.0,
+        4.660328746242115e-07
+      ]
+    },
+    "TC_Pose_Battledroid": {
+      "duration": 0.008333333767950535,
+      "nodes": 68,
+      "channels": 204
+    },
+    "TC_Pose_Fighter": {
+      "duration": 0.008333333767950535,
+      "nodes": 68,
+      "channels": 204
+    },
+    "TC_Pose_VTOL": {
+      "duration": 0.008333333767950535,
+      "nodes": 68,
+      "channels": 204
+    },
+    "TC_VTOLToBattledroid": {
+      "duration": 1.899999976158142,
+      "nodes": 68,
+      "channels": 204,
+      "maximum_local_matrix_error": 0.0012811370189445004,
+      "endpoint_errors": [
+        4.660328746242115e-07,
+        3.3717483450142784e-07
+      ]
+    },
+    "TC_VTOLToFighter": {
+      "duration": 1.5,
+      "nodes": 68,
+      "channels": 204,
+      "maximum_local_matrix_error": 0.0012094580614505634,
+      "endpoint_errors": [
+        4.660328746242115e-07,
+        0.0
+      ]
+    },
+    "BD_Idle": {
+      "duration": 2.0,
+      "nodes": 36,
+      "channels": 108
+    },
+    "BD_Run": {
+      "duration": 0.75,
+      "nodes": 36,
+      "channels": 108
+    },
+    "BD_Walk": {
+      "duration": 1.0,
+      "nodes": 36,
+      "channels": 108
+    }
+  },
+  "protected_sha256": {
+    "assets/blender/TC167.blend": "91b61a4f2c98b9c3e6cacb09e5076f0bc3d83c376cb7c5f531c2541cab545d27",
+    "assets/blender/TC167_Animated.blend": "4f80d004a51a9a03afa453ca26d8daa821d7f05434afe070f9a38d8506d804ae",
+    "assets/models/vehicles/tc167.glb": "4683bcc9547b1effdb2ec519bbd37c02e3fc3a1eca9f2d9c0fbd9940881fd19e",
+    "assets/models/vehicles/tc167_animated.glb": "7a42ef62d960e35e9280823f7a314e1b6c20007332d3ee6292a974597e27ab17"
+  }
+}

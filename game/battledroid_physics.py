@@ -77,6 +77,11 @@ def contact_clearance(vehicle, parameters=BATTLEDROID):
     Returns:
         Required vertical clearance in meters.
     """
+    from game.reference_anchors import clearance as anchor_clearance
+
+    value = anchor_clearance(vehicle)
+    if value is not None:
+        return value
     from game.ground_contact import transformation_clearance
 
     transition = transformation_clearance(vehicle)

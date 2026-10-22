@@ -83,15 +83,15 @@ class TransformationTests(unittest.TestCase):
             )
         )
 
-    def test_norm_quaternions_positive_scales_and_hierarchy_every_sample(self):
-        """Verify norm quaternions positive scales and hierarchy every sample."""
+    def test_norm_quaternions_signed_scales_and_hierarchy_every_sample(self):
+        """Signed glTF scales are valid; all sampled components and hierarchies stay finite."""
         for edge in DURATIONS:
             for t in np.linspace(0, 1, 11):
                 self.c.apply_curve(*edge, t)
                 self.c.model.world_matrices()
                 for value in self.c.current_pose.values():
                     self.assertAlmostEqual(np.linalg.norm(value.rotation), 1)
-                    self.assertTrue(all(s > 0 for s in value.scale))
+                    self.assertTrue(np.isfinite(value.scale).all())
                 for n in self.c.model.nodes:
                     if n.parent is not None:
                         np.testing.assert_allclose(
@@ -137,7 +137,7 @@ class TransformationTests(unittest.TestCase):
 
     def test_physics_switch_only_at_sixty_percent_preserves_everything(self):
         """Verify physics switch only at sixty percent preserves everything."""
-        g = Game(enemy_count=0)
+        g = Game(legacy_animation=True, enemy_count=0)
         v = g.player_vehicle
         c = v.transformation
         v.position[:] = (10, 1000, -20)
@@ -169,7 +169,7 @@ class TransformationTests(unittest.TestCase):
         self.assertEqual((v.defenses.flares, v.defenses.chaff, v.defenses.ecm_enabled), stores)
 
     def test_reverse_physics_hysteresis(self):
-        g = Game(enemy_count=0)
+        g = Game(legacy_animation=True, enemy_count=0)
         c = g.player_vehicle.transformation
         c.cycle()
         c.update(1.2)
@@ -199,7 +199,7 @@ class TransformationTests(unittest.TestCase):
 
     def test_space_inertial_transformation_continues_physics(self):
         """Verify space inertial transformation continues physics."""
-        g = Game(enemy_count=0)
+        g = Game(legacy_animation=True, enemy_count=0)
         g.flight_controller.switch_space()
         v = g.player_vehicle
         v.velocity[:] = (140, 12, -90)
@@ -219,7 +219,7 @@ class TransformationTests(unittest.TestCase):
 
     def test_atmospheric_high_speed_transform_compares_existing_force_models(self):
         """Verify atmospheric high speed transform compares existing force models."""
-        g = Game(enemy_count=0)
+        g = Game(legacy_animation=True, enemy_count=0)
         g.flight_controller.reset_atmosphere()
         v = g.player_vehicle
         v.velocity[:] = (0, 0, -180)
@@ -228,7 +228,7 @@ class TransformationTests(unittest.TestCase):
         g.input.toggle_configuration = True
         g.update(0)
         g.input.toggle_configuration = False
-        reference = Game(enemy_count=0)
+        reference = Game(legacy_animation=True, enemy_count=0)
         reference.flight_controller.reset_atmosphere()
         rv = reference.player_vehicle
         rv.velocity[:] = (0, 0, -180)
@@ -247,7 +247,7 @@ class TransformationTests(unittest.TestCase):
 
     def test_battledroid_lands_and_walks_with_new_pose(self):
         """Verify battledroid lands and walks with new pose."""
-        g = Game(enemy_count=0)
+        g = Game(legacy_animation=True, enemy_count=0)
         g.setup_battledroid_test("landing")
         v = g.player_vehicle
         v.throttle = 0
@@ -282,7 +282,7 @@ class TransformationTests(unittest.TestCase):
 
     def test_hud_during_transform_and_game_reset(self):
         """Verify hud during transform and game reset."""
-        g = Game(enemy_count=0)
+        g = Game(legacy_animation=True, enemy_count=0)
         v = g.player_vehicle
         c = v.transformation
         c.cycle()
@@ -309,7 +309,7 @@ class TransformationTests(unittest.TestCase):
 
     def test_combat_keeps_firing_and_countermeasures_work_during_transform(self):
         """Verify combat keeps firing and countermeasures work during transform."""
-        g = Game(enemy_count=0)
+        g = Game(legacy_animation=True, enemy_count=0)
         v = g.player_vehicle
         g.input.toggle_configuration = True
         g.update(0)
@@ -333,7 +333,7 @@ class TransformationTests(unittest.TestCase):
 
     def test_ground_switch_has_no_transform_teleport(self):
         """Verify ground switch has no transform teleport."""
-        g = Game(enemy_count=0)
+        g = Game(legacy_animation=True, enemy_count=0)
         g.setup_battledroid_test("ground")
         v = g.player_vehicle
         before = v.position.copy()
@@ -351,7 +351,7 @@ class TransformationTests(unittest.TestCase):
         """Verify renderer draws one canonical model in every mode."""
         from engine.renderer import Renderer
 
-        g = Game(enemy_count=0)
+        g = Game(legacy_animation=True, enemy_count=0)
         r = Renderer(g.world, g.player_vehicle, g.camera)
         r.environment_mesh = Mock()
         r.shader = Mock()
@@ -394,7 +394,7 @@ class TransformationTests(unittest.TestCase):
         """Verify transform hud geometry has glyphs and finite vertices."""
         from engine.hud import HUD
 
-        g = Game(enemy_count=0)
+        g = Game(legacy_animation=True, enemy_count=0)
         hud = HUD()
         hud.resize(1280, 720)
         g.player_vehicle.transformation.cycle()

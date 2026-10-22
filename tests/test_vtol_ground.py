@@ -215,7 +215,7 @@ class VTOLGroundTests(unittest.TestCase):
             (M.BATTLEDROID, M.VTOL, 3.2),
             (M.VTOL, M.BATTLEDROID, foot_geometry()[1]),
         ):
-            g = Game(enemy_count=0)
+            g = Game(enemy_count=0, legacy_animation=True)
             g.setup_battledroid_test("ground")
             v = g.player_vehicle
             v.transformation.reset(source)

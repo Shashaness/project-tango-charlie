@@ -1,197 +1,225 @@
-# TC167 animated Blender authoring setup — M21.1
+# TC167 Blender Actions and game integration — M21.4
 
-Open [TC167_Animated.blend](../assets/blender/TC167_Animated.blend) in Blender 5.0.1.
-It opens at frame 1 in the canonical BATTLEDROID stance, with `BD_Idle` active and
-the viewport framed for editing. The original `TC167.blend` and `tc167.glb` were
-preserved. The separate runtime asset is
-[tc167_animated.glb](../assets/models/vehicles/tc167_animated.glb).
+Blender owns visual motion. Python owns controls, world position/orientation, flight,
+forces, contact resolution, and playback state. The default vehicle is
+`assets/models/vehicles/tc167_authoring.glb`, exported from
+`assets/blender/TC167_Authoring.blend`. The pre-milestone restored file is preserved
+as `backups/TC167_Authoring_pre_M21_4.blend`. Prior authoring instructions are retained
+in [the M21.3 archive](TC167_M21_3_AUTHORING_ARCHIVE.md); their frozen geometry and
+Python pose-candidate workflow apply only to legacy assets.
 
-These are working starter cycles for further artistic refinement. Blender plays
-stored object keyframes directly. The saved helper script only switches Action
-slots; playback has no Python drivers, armature, or skeletal skinning.
+## Actions and ownership
 
-## Actions and timing
+The game plays the real exported channels, including intermediate keyframes,
+per-channel interpolation, and independent Action durations:
 
-Each Action has 36 rigid-object slots, 360 editable FCurves, and closed endpoints.
-The scene uses 24 FPS. The duplicate endpoint closes the cycle; elapsed duration
-is `(last frame - first frame) / 24`, rather than counting the endpoint twice.
-
-| Action | Frames | Duration | Real keyframe points | Motion |
-| --- | --- | --- | ---: | --- |
-| BD_Idle | 1–49 | 2 seconds | 17,640 | 12 mm torso movement, subtle shoulders/head, fixed feet |
-| BD_Walk | 1–25 | 1 second | 9,000 | Alternating planted/lifted feet, knees, opposing arms, torso counterrotation |
-| BD_Run | 1–19 | 0.75 seconds | 6,840 | Longer stride, faster articulation, stronger arm swing, 6° forward lean |
-
-Root translation and orientation are constant throughout all three loops. Walk
-uses a 1.20 m stance sweep over 60% of its cycle, matching the M21 nominal 2 m/s.
-Run uses a 1.89 m stance sweep over 42% of its cycle, matching nominal 6 m/s.
-The legs use their existing 2.6 m links, with modest suspension compression and
-flat ankle orientation. Walk swing-foot lift is 0.23 m; run lift is 0.40 m.
-The head counteracts body lean and receives restrained motion rather than tracking
-every arm/leg movement.
-
-Curve keys use LINEAR interpolation and Cycles modifiers for editing/playback.
-The exported glTF uses supported LINEAR and STEP samplers. You can refine the
-Blender curves in the Graph Editor; the supplied exporter samples them every frame.
-
-## Preview and select clips
-
-1. Open the animated file and press Space to play the active idle cycle.
-2. In a Text Editor, select the saved `TC167_Action_Controls.py` text and choose
-   **Run Script** once. Open the 3D Viewport sidebar (`N`) and select **TC167**.
-3. Click `BD_Idle`, `BD_Walk`, or `BD_Run`. Each button assigns all relevant object
-   slots to the shared Action and sets its matching playback range.
-4. Select a joint such as `LeftUpperLeg`, `RightLowerLeg`, `LeftFoot`, `TorsoCore`,
-   `LeftUpperArm`, or `Head`. Use Dope Sheet → Action Editor to edit its slot, and
-   the Graph Editor to edit Location, Quaternion Rotation, and Scale curves.
-5. Preserve matching first/last keys for seamless looping. Save your `.blend` edits
-   before running the export command.
-
-The three Actions are also retained in muted single-strip NLA tracks. These archive
-the Actions for export; they do not stack multiple gaits on the model. The helper
-turns NLA evaluation off while assigning the selected Action. Changing the Action
-on one selected object in the Action Editor changes only that object's slot;
-the sidebar buttons switch the whole machine together.
-
-`TC167_README`, `TC167_FIGHTER_BASIS.json`, and `TC167_GEOMETRY_BASELINE.json` are
-saved Text datablocks containing instructions and export/rest-preservation metadata.
-The BD animation data lives in the Actions' FCurves.
-
-## Restore FIGHTER
-
-Click **FIGHTER_Rest** in the TC167 sidebar. This real restoration Action assigns
-all 68 runtime objects their production transforms at frame 0. Reopening the file
-and evaluating this Action was verified to reproduce the original Blender local
-matrices exactly, including the original mirrored parts.
-
-Click **BD_Idle** to return to the standing BATTLEDROID reference. Do not apply
-transforms, change origins, clear parent inverses, or edit meshes to switch poses.
-
-## Hierarchy, units, and coordinate conversion
-
-The source Blender file has 71 objects: the 68 runtime nodes and three existing
-helper empties (`Empty`, `Empty.001`, and `Empty.002`). All remain in the authoring
-copy. Export selects the production 68-node hierarchy rooted at `TC167Root`.
-
-| Nodes | Existing parent | Role |
+| Purpose | Action | Current duration (seconds) |
 | --- | --- | --- |
-| Fuselage | TC167Root | Main body configuration/lean |
-| TorsoCore, Head | Fuselage | Torso and head articulation |
-| Left/RightIntake | TC167Root | Hip carrier and intake geometry |
-| Left/RightUpperLeg | Corresponding Intake | Hip articulation |
-| Left/RightLowerLeg | Corresponding UpperLeg | Knee articulation |
-| Left/RightFoot | Corresponding LowerLeg | Ankle and foot placement |
-| Left/RightShoulder | TC167Root | Shoulder pivot |
-| Left/RightUpperArm | Corresponding Shoulder | Arm swing |
-| Left/RightForearm, Hand | Corresponding UpperArm, Forearm | Elbow and hand chain |
-| Left/RightEngine | TC167Root | Root siblings whose foot attachments are baked into object keys |
+| FIGHTER configuration | TC_Pose_Fighter | static, 0.008333 |
+| VTOL configuration | TC_Pose_VTOL | static, 0.008333 |
+| BATTLEDROID configuration | TC_Pose_Battledroid | static, 0.008333 |
+| FIGHTER → VTOL | TC_FighterToVTOL | 1.5 |
+| VTOL → FIGHTER | TC_VTOLToFighter | 1.5 |
+| VTOL → BATTLEDROID | TC_VTOLToBattledroid | 1.9 |
+| BATTLEDROID → VTOL | TC_BattledroidToVTOL | 1.9 |
+| Idle | BD_Idle | 2.0 |
+| Walk | BD_Walk | 1.0 |
+| Run | BD_Run | 0.75 |
 
-Mesh companions keep their original parents, geometry, and material assignments.
-The existing `BATTLEDROID_POSE` supplies the absolute parent-local reference values;
-`TransformationController.reset(BATTLEDROID)` also evaluates the authoritative
-engine attachment transforms. The idle cycle's first pose matches that result
-within **0.000000573** maximum matrix-component error after Blender/float32 export.
+Configuration Actions are sampled at their first frame. Transformations sample their
+entire authored timeline. All TRS channels are absolute node-local values. Missing
+transformation components use the source configuration, then imported rest; missing
+locomotion components use TC_Pose_Battledroid. The full pose is rebuilt each time,
+so an old Action cannot leave stale components. Locomotion uses absolute poses,
+not offsets or an extra multiplication of the BD configuration. Idle/walk/run
+crossfade over 0.12 seconds. Walk and run cadence follows physical horizontal speed;
+airborne/space/crashed BD uses the idle Action. There are no Python joint or engine
+attachment corrections in this runtime.
 
-Source glTF coordinates use +Y up and +Z toward the nose. Blender uses +Z up:
+STEP, LINEAR (quaternion shortest-arc slerp), and glTF CUBICSPLINE are supported.
+Cubic tangents retain their derivative values and are scaled by key intervals;
+quaternion results are normalized. Signed and zero scale components are legal.
+The loader preserves node indices, parent hierarchy, and newly exported objects.
 
-```text
-Blender (X, Y, Z) = glTF (X, -Z, Y)
-Blender quaternion = (w, x, y, z)
-glTF quaternion    = (x, y, z, w)
-```
+`TC_ROOT` is a static, non-rendered model reference and must never have animation
+channels; such a GLB is rejected. The simulation supplies the outer vehicle world
+matrix. The existing `TC167Root` remains an artistic visual datum (including BD's
+local body lift); its channels affect the model and its articulated anchors only,
+never vehicle position, orientation, momentum, or world travel. In-place locomotion
+never extracts or applies root motion to physics. Do not animate a locomotion travel
+path: animate steps in place.
 
-For conversion matrix `C`, source node-local matrices become `C M C⁻¹`. Six source
-mesh objects have nonidentity parent inverses: the three right intake surfaces and
-the right upper-leg, lower-leg, and foot mesh companions. The keyed Blender basis
-is `parent_inverse⁻¹ C M C⁻¹`; their existing parent inverses remain unchanged.
-The game's separate 180° Y root conversion is applied by its renderer, not baked
-again into the Blender object animation.
+## Playback behavior
 
-One unit is one meter. The canonical root datum is 3.2873 m upward, and the soles
-stand near Blender Z = −3.2 m because the model is expressed relative to the
-physical center of mass. The root datum stays constant within each loop. The game
-adds its world-space vehicle position independently.
+G cycles configurations; G during transformation reverses. FIGHTER ↔ BATTLEDROID
+routes through VTOL. Physics mode switches when the current authored Action completes.
+Time remaining in a long update carries into queued transitions.
 
-## Export saved artist edits
+A reversal captures the currently rendered full local pose, bridges for 0.15 seconds
+to the separately authored reverse Action's first frame, then plays that entire
+Action forward. It does not sample the original Action backward. This guarantees
+continuity at the request instant while retaining all reverse choreography; a very
+different reverse starting pose can require a visible short repositioning bridge.
+Starting a transformation from locomotion uses the same bridge. Bridge duration is
+separate from the Action's duration.
 
-Run from the project root after saving the Blender file:
+The controller API supports `request(mode)` (append a valid path), `reverse()`
+(clear queue), `interrupt(mode)` (reverse continuously and route onward), `pause()`,
+`resume()`, and `restart()` (bridge to first frame and replay). Pause freezes both
+clip and bridge clocks. `reset(mode)` is an intentional immediate development reset
+and leaves world physics untouched. No missing Action silently invokes legacy poses.
+
+## Blender sidebar and configuration editing
+
+1. Open the authoring blend in Blender 5.0.1. In a Text Editor run the embedded
+   **TC167_Action_Controls.py** (Alt-P). Return to the 3D Viewport, press **N**, and
+   select **TC167**. The embedded script is self-contained; it needs no game import.
+2. Choose FIGHTER, VTOL, or BATTLEDROID. This assigns all required Action slots,
+   disables NLA mixing, and sets the timeline. Turn Auto Keying off while editing
+   configuration poses. Move/rotate objects with ordinary Blender tools.
+3. Click **Save Configuration Pose**, then **Preview Endpoint Changes**. The full
+   proposed changes are in Text Editor → `TC167_Last_Report.json`.
+4. Choose **Sync Transformation Endpoints**, review its dialog and apply the changes.
+   Only endpoint keys change. Interior keys, handles, interpolation and timing survive.
+   The confirmation belongs to Blender's existing editing workflow, not game startup.
+5. **Validate Configuration Consistency** checks endpoint agreement. **Validate for
+   Game** checks required Actions, slots/targets, supported rigid-object channels,
+   endpoint consistency, references and export requirements. Read the report for
+   actionable errors. Save with Ctrl-S.
+6. Choose any transformation button for immediate timeline playback/editing. Play /
+   Pause, First Frame, and Reset to Configuration remain available. BD preview uses
+   the BD configuration for components not keyed by the locomotion Action.
+
+The restored original supplied for M21.4 contained identical Fighter/VTOL endpoint
+poses. With user approval, TC_Pose_VTOL was restored from the preserved M21.2 blend
+and 64 adjoining endpoint channel groups synchronized. Existing intermediate motion
+was preserved. No new transformation motion was generated from Python pose tables.
+
+## New articulated components and scorpion-tail walkthrough
+
+Separate selected fuselage faces into a new object, or add a mechanical pivot and
+parent the segment beneath it. Keep meaningful stable names; the tooling does not
+rename objects. Use **Register New Articulated Objects** to adopt their local rest
+transforms, create missing configuration/transition slots and endpoint channels,
+and remove deleted decorative targets from the manifest/slots. Existing artistic
+channels are preserved. Then choose a configuration again before editing and saving.
+Ordinary unanimated decorative geometry can also be exported without registration.
+
+For a scorpion-tail fuselage, create several separated segments with a nested pivot
+chain. Set the straight Fighter and curved VTOL endpoint shapes, save each
+configuration, preview and synchronize endpoints. Select TC_FighterToVTOL, move to
+an interior frame (for example frame 91), bend the segments upward in sequence and
+insert Quaternion Rotation/Location keys into that Action's corresponding object
+slots. Use the Graph Editor to shape timing and interpolation. Author the reverse
+Action independently. Validate, save and export. The game samples those exact
+interior exported channels; no Python node-name list or pose-table edit is required.
+The restored production asset is kept free of experimental scorpion-tail geometry;
+the automated round-trip test creates a temporary articulated fuselage mesh and
+verifies that its intermediate bend survives export and runtime evaluation.
+
+After changing geometry, review physical support/body references and obstacle
+clearance. The program cannot infer safe collision geometry from appearance.
+Bake constraints/drivers to rigid object TRS before export; skeletal/skinned and
+morph animation are outside this rigid-node runtime.
+
+## Physical references
+
+All references are non-rendered Empties. Names are case-sensitive; `<id>` is any
+stable identifier and cardinality is variable:
+
+| Name | Purpose |
+| --- | --- |
+| TC_ROOT | Static top-level vehicle reference |
+| TC_GROUND_FIGHTER / VTOL / BATTLEDROID | Configuration ground datum |
+| TC_CONTACT_FIGHTER_\<id\> | Gear contacts (starter LEFT, RIGHT, NOSE) |
+| TC_CONTACT_VTOL_\<id\> | VTOL supports |
+| TC_CONTACT_BATTLEDROID_\<id\> | Feet/supports |
+| TC_THRUST_\<id\> | Propulsion locations |
+| TC_BODY_\<MODE\>_\<id\> | Terrain/body underside clearance samples |
+| TC_HULL_\<MODE\>_\<id\> | Explicit 3D obstacle-envelope corners |
+| TC_MUZZLE_ / TC_HARDPOINT_\<id\> | Optional weapon references |
+| TC_CAMERA / TC_COCKPIT | Optional viewing references |
+
+**Create Missing References** seeds the original vehicle only and never moves existing
+anchors. It is not a collision-design generator for redesigns. **Display / Hide**,
+**Select Ground Reference**, **Select Landing Contacts**, **Select Thrust Anchors**,
+and **Validate Anchors** support ordinary G/R tools. Parent contacts/thrust markers
+to their articulated component. Ground datums/body/hull references may be root-relative.
+If a redesign has more supports or engines, add further named references; there is
+no runtime assumption of exactly two feet/engines or three wheels. Ground markers
+can deliberately specify a higher support datum than the individual contacts.
+
+Reference positions follow the evaluated GLB hierarchy and vehicle orientation.
+Terrain height is sampled at each support/body point, so slope and elevation affect
+contact altitude. During transformations, both modes' animated contacts and body
+references form a conservative envelope; static destination ground datums do not
+prematurely lift the vehicle. Contact correction moves the physical vehicle, with
+no independent cosmetic model repositioning. Fighter wheel/runway queries consume
+authored contacts. VTOL and BD bypass cached legacy foot vertices, Python pose
+clearance interpolation and fixed BD height. Explicit hull corners replace original
+fixed obstacle bounds for the authored vehicle. Underside samples, contacts, and
+3D hull bounds have separate roles: ground markers alone are not collision geometry.
+The existing terrain slope limits, landing impulses, friction and flight forces remain.
+Legacy gear extension remains an operational physics state; this milestone does not
+add a separately authored retracting-gear Action.
+
+Starter hulls are conservative envelopes for the original model, not detailed mesh
+collision or certified redesign envelopes. Review them in Blender after any geometry
+change. Optional weapon/camera references are exported and queryable, but existing
+weapon aiming/camera behavior is unchanged; thrust references do not retune forces.
+
+## Export, launch, diagnostics and validation
+
+From the repository root:
 
 ```sh
 /Applications/Blender.app/Contents/MacOS/Blender \
   --background --factory-startup --python-exit-code 1 \
-  --python tools/author_tc167_blender.py -- \
-  --export-only \
-  --blend-input assets/blender/TC167_Animated.blend \
-  --glb-output assets/models/vehicles/tc167_animated.glb
+  --python tools/export_tc167_authored.py
 
-python -m tools.inspect_glb_animations \
-  assets/models/vehicles/tc167_animated.glb --require-bd-clips
-
-python main.py --vehicle-model assets/models/vehicles/tc167_animated.glb \
-  --battledroid-test ground --enemies 0
+.venv/bin/python main.py --vehicle-model assets/models/vehicles/tc167_authoring.glb \
+  --animation-debug --anchor-debug
 ```
 
-`--export-only` reads your saved FCurves and exports their current values. It does
-not regenerate the starter cycles or save over the `.blend` file. A verification
-edit to an actual torso keyframe was exported and detected in the resulting glTF
-channel values.
+The requested `python main.py --vehicle-model assets/models/vehicles/tc167_authoring.glb`
+also works when `python` resolves to the environment containing requirements.txt.
+Plain launch uses the same authoring GLB by default. Press G and inspect the Action,
+playback time/duration and progress overlay. Debug flags are disabled by default.
+Contact crosses are amber, thrust blue, body/hull red, ground green. H retains
+existing force diagnostics. Both local artistic motion and physical references can
+be compared against the vehicle and ground.
 
-The exporter restores the original FIGHTER basis for the temporary Blender export,
-uses Actions mode with merge-by-Action, samples at one-frame intervals, and slides
-clip time to zero. It selects the production hierarchy and exports no skin, morph,
-camera, light, or flattened hierarchy.
-
-For the game GLB it retains the original production document's geometry, materials,
-node-local rest TRS, and binary geometry prefix exactly, then appends animation
-accessors decoded from Blender's export. Targets are mapped by unchanged node
-names to their original indices. This keeps the saved BATTLEDROID authoring pose
-from becoming a new incompatible bind pose. Use this command when exporting to
-the M21 runtime so the production rest/material contract remains intact.
-
-Mesh, material-assignment, hierarchy, or parent-inverse edits are rejected by the
-saved geometry baseline. Animation edits remain editable and exportable. The
-original `TC167.blend` and `tc167.glb` are protected output paths.
-
-To generate another starter copy, choose a new output filename:
+Explicit compatibility mode:
 
 ```sh
-/Applications/Blender.app/Contents/MacOS/Blender \
-  --background --factory-startup --python-exit-code 1 \
-  --python tools/author_tc167_blender.py -- \
-  --blend-output assets/blender/TC167_Animated_New.blend \
-  --glb-output assets/models/vehicles/tc167_animated_new.glb
+.venv/bin/python main.py --legacy-animation
+# Original procedural locomotion too, if desired:
+.venv/bin/python main.py --legacy-animation --no-gltf-animation
 ```
 
-Creation refuses to overwrite an existing authoring file. Use export-only for
-normal work on the prepared file.
+The legacy default asset is `assets/models/vehicles/tc167.glb`. Older models can be
+selected explicitly with `--legacy-animation --vehicle-model PATH`. No unrelated
+production GLBs or older milestone blends are rewritten.
 
-## Rendered samples
+The full exporter exports actual scene geometry, hierarchy, anchors and Actions;
+it does not copy animation buffers onto a frozen original GLB. `--blend-input PATH`
+and `--glb-output PATH` support copies. `--install` embeds the current sidebar source
+and creates missing original-vehicle anchors; ordinary export never saves the blend
+or resets artist-positioned references. Invalid/missing Actions, slot targets,
+unsynchronized endpoints, TC_ROOT animation, missing physical references, and invalid
+hulls produce errors. Fix the reported Blender contract rather than using a pose
+candidate. `tools/tc167_runtime_pose_bridge.py` is now an offline legacy tool only.
 
-These Blender Workbench renders use a temporary preview floor and camera that were
-not saved into the model file.
+```sh
+.venv/bin/python -m unittest discover -s tests
+/Applications/Blender.app/Contents/MacOS/Blender \
+  --background --factory-startup --python-exit-code 1 \
+  --python tools/validate_tc167_runtime_blender.py
+.venv/bin/python -m tools.check_transformation_gl --output /tmp/m21_4_render
+```
 
-| Idle | Walk | Run |
-| --- | --- | --- |
-| ![Idle](images/TC167_BD_Idle.png) | ![Walk](images/TC167_BD_Walk.png) | ![Run](images/TC167_BD_Run.png) |
-
-## Validation
-
-- Original Blender and production GLB SHA-256 hashes remain unchanged.
-- Reopened authoring copy: object names, hierarchy, parent inverses, mesh
-  coordinates/topology/UVs, material assignments, and material shader data match
-  the source. Unused source materials/meshes are retained using fake users.
-- All Actions contain genuine keyframes, with matching endpoints and no root
-  displacement. The file contains no armature.
-- Native GLB geometry/material arrays and FIGHTER rest matrices are exact copies
-  of production data; all three clips pass the M21 loader.
-- Idle feet are fixed. Dense native sampling found walk/run contact interpolation
-  error below 2.1 mm around the canonical floor; swing feet lift as intended.
-- Seven new asset tests pass, including full game updates with identical physics
-  for native/procedural backends and preserved transformation endpoints.
-- Complete suite: **427 tests, 425 passed, two unchanged pre-existing failures**
-  concerning wing bounds and mirrored pose scales. Existing 35 lint findings remain.
-
-Detailed machine-readable results are in
-[TC167_AUTHORING_VALIDATION.json](TC167_AUTHORING_VALIDATION.json). Physics,
-locomotion decisions, transformation logic, and the M21 animation engine were not
-changed for this milestone.
+The Blender test compares evaluated world matrices at start/middle/end of all ten
+Actions with game evaluation, verifies an added articulated mesh and artistic
+intermediate edit on temporary copies, and checks endpoint sync preserves interior
+keys. Results are in `M21_4_BLENDER_VALIDATION.json`. See
+[M21_4_RESULTS.md](M21_4_RESULTS.md) for final verification and limitations.

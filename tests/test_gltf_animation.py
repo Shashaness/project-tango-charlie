@@ -454,7 +454,7 @@ class NativeBattledroidTests(unittest.TestCase):
                 ],
             )
         write_glb(self.path, document, binary)
-        self.game = Game(enemy_count=0, vehicle_model_path=self.path)
+        self.game = Game(legacy_animation=True, enemy_count=0, vehicle_model_path=self.path)
         self.game.setup_battledroid_test("ground")
         self.vehicle = self.game.player_vehicle
         self.animation = self.vehicle.animation
@@ -498,7 +498,7 @@ class NativeBattledroidTests(unittest.TestCase):
         self.assertFalse(self.vehicle.animation.native_enabled)
 
     def test_zero_default_clips_preserve_procedural_backend(self):
-        game = Game(enemy_count=0)
+        game = Game(legacy_animation=True, enemy_count=0)
         game.setup_battledroid_test("ground")
         vehicle = game.player_vehicle
         vehicle.velocity[:] = (0, 0, -2)
@@ -591,7 +591,7 @@ class NativeBattledroidTests(unittest.TestCase):
             np.testing.assert_allclose(actual, offset, atol=1e-10)
 
     def test_full_game_updates_match_disabled_backend_physics(self):
-        fallback = Game(enemy_count=0, vehicle_model_path=self.path, gltf_animation=False)
+        fallback = Game(legacy_animation=True, enemy_count=0, vehicle_model_path=self.path, gltf_animation=False)
         fallback.setup_battledroid_test("ground")
         self.game.input.pitch = fallback.input.pitch = -1
         for _ in range(20):

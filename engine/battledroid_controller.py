@@ -60,12 +60,22 @@ class BattledroidController:
             return
         atmosphere = v.flight_state.environment is Environment.ATMOSPHERE
         height = self.ground_height(v.position) if atmosphere else None
+        from game.reference_anchors import authored, floor
+
+        support_floor = (
+            floor(v, self.ground_height)
+            if authored(v) and atmosphere
+            else None
+            if height is None
+            else height + contact_clearance(v)
+        )
         # Contact is geometric, not merely a zero vertical velocity.
         supported = (
             atmosphere
             and height is not None
             and v.flight_state.status is FlightStatus.GROUNDED
-            and v.position[1] <= height + contact_clearance(v) + 0.03
+            and support_floor is not None
+            and v.position[1] <= support_floor + 0.03
         )
         if not supported and v.flight_state.status is FlightStatus.GROUNDED:
             v.flight_state.status = FlightStatus.FLYING
@@ -148,7 +158,11 @@ class BattledroidController:
         v.rotate(**rotation)
         ground.depth = 0.0
         if atmosphere and height is not None:
-            clearance = height + contact_clearance(v)
+            from game.reference_anchors import authored, floor
+
+            clearance = (
+                floor(v, self.ground_height) if authored(v) else height + contact_clearance(v)
+            )
             from game.ground_contact import resolve_contact
 
             resolve_contact(

@@ -37,6 +37,11 @@ def clearance(vehicle):
     Returns:
         Required center-of-mass altitude in meters.
     """
+    from game.reference_anchors import clearance as anchor_clearance
+
+    value = anchor_clearance(vehicle)
+    if value is not None:
+        return value + PARAMETERS.ground_altitude
     from game.airfield_operations import GearState
 
     ops = vehicle.airfield
@@ -85,6 +90,15 @@ class FighterGroundContact:
             Required vehicle Y position in meters.
         """
         v = self.vehicle
+        from game.reference_anchors import authored, floor
+
+        if authored(v):
+            height = (
+                self.environment.height
+                if self.environment is not None
+                else lambda p: PARAMETERS.ground_altitude
+            )
+            return floor(v, height)
         if self.environment is None:
             return clearance(v)
         points = v.airfield.wheel_world(v)

@@ -85,7 +85,7 @@ class AnimationTests(unittest.TestCase):
     """Animation regression tests."""
 
     def setUp(self):
-        self.game = Game(enemy_count=0)
+        self.game = Game(legacy_animation=True, enemy_count=0)
         self.game.setup_battledroid_test("ground")
         self.v = self.game.player_vehicle
         self.a = self.v.animation
@@ -240,7 +240,7 @@ class AnimationTests(unittest.TestCase):
             self.a.prepare(1 / 120, self.v, self.p)
             self.v.locomotion.update(1 / 120, self.v, self.p)
             self.a.update()
-        reference = Game(enemy_count=0)
+        reference = Game(legacy_animation=True, enemy_count=0)
         reference.player_vehicle.transformation.reset(M.VTOL)
         for n, r in zip(self.a.model.nodes, reference.player_vehicle.transformation.model.nodes):
             np.testing.assert_array_equal(n.local_matrix, r.local_matrix)

@@ -73,6 +73,11 @@ def transformation_clearance(vehicle):
     Returns:
         Clearance in meters, or None outside the relevant active transition.
     """
+    from game.reference_anchors import clearance as anchor_clearance
+
+    value = anchor_clearance(vehicle)
+    if value is not None:
+        return value
     c = getattr(vehicle, "transformation", None)
     if c is None or not c.active or c._edge != (VehicleMode.VTOL, VehicleMode.BATTLEDROID):
         return None

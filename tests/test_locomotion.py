@@ -18,7 +18,7 @@ class LocomotionTests(unittest.TestCase):
     """Locomotion regression tests."""
 
     def setUp(self):
-        self.g = Game(enemy_count=0)
+        self.g = Game(legacy_animation=True, enemy_count=0)
         self.g.setup_battledroid_test("ground")
         self.v = self.g.player_vehicle
         self.a = self.v.locomotion
@@ -218,7 +218,7 @@ class LocomotionTests(unittest.TestCase):
         self.a.clear_layer()
         self.v.transformation.update(2)
         self.a.update(2, self.v, self.p)
-        ref = Game(enemy_count=0)
+        ref = Game(legacy_animation=True, enemy_count=0)
         ref.player_vehicle.transformation.reset(M.VTOL)
         for n, r in zip(self.a.model.nodes, ref.player_vehicle.transformation.model.nodes):
             np.testing.assert_array_equal(n.local_matrix, r.local_matrix)
@@ -259,7 +259,7 @@ class LocomotionTests(unittest.TestCase):
 
     def test_enabled_disabled_full_game_physical_trajectory_matches(self):
         """Verify enabled disabled full game physical trajectory matches."""
-        other = Game(enemy_count=0, locomotion_animation=False)
+        other = Game(legacy_animation=True, enemy_count=0, locomotion_animation=False)
         other.setup_battledroid_test("ground")
         for i in range(160):
             for game in (self.g, other):

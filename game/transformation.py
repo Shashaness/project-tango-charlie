@@ -40,6 +40,8 @@ def phase(t, start=0, end=1):
 class TransformationController:
     """Evaluate reversible staged poses and switch configuration without owning momentum."""
 
+    authority = "Legacy"
+
     def __init__(self, vehicle=None, model=None):
         """Load or retain the model, cache rest/attachment data, and select fighter pose.
 

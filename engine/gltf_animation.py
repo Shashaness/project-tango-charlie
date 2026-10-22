@@ -29,12 +29,12 @@ class AnimationSampler:
             or times[0] < 0
             or np.any(np.diff(times) <= 0)
             or values.ndim != 2
-            or len(values) != len(times)
+            or len(values) != len(times) * (3 if self.interpolation == "CUBICSPLINE" else 1)
             or values.shape[1] not in (3, 4)
             or not np.isfinite(values).all()
         ):
             raise ValueError("Invalid animation keyframe times or values")
-        if self.interpolation not in ("LINEAR", "STEP"):
+        if self.interpolation not in ("LINEAR", "STEP", "CUBICSPLINE"):
             raise ValueError(f"Unsupported animation interpolation: {self.interpolation}")
         times.setflags(write=False)
         values.setflags(write=False)
@@ -53,6 +53,23 @@ class AnimationSampler:
         """
         if not math.isfinite(time) or time < 0:
             raise ValueError("Animation sample time must be finite and nonnegative")
+        if self.interpolation == "CUBICSPLINE":
+            keys = self.values.reshape(len(self.times), 3, -1)
+            i = int(np.searchsorted(self.times, time, side="right") - 1)
+            if i < 0:
+                value = keys[0, 1].copy()
+            elif i >= len(self.times) - 1:
+                value = keys[-1, 1].copy()
+            else:
+                span = self.times[i + 1] - self.times[i]
+                u = (time - self.times[i]) / span
+                value = (
+                    (2 * u**3 - 3 * u**2 + 1) * keys[i, 1]
+                    + (u**3 - 2 * u**2 + u) * span * keys[i, 2]
+                    + (-2 * u**3 + 3 * u**2) * keys[i + 1, 1]
+                    + (u**3 - u**2) * span * keys[i + 1, 0]
+                )
+            return normalize(value) if rotation else value
         index = int(np.searchsorted(self.times, time, side="right") - 1)
         if index < 0:
             return self.values[0].copy()
@@ -80,7 +97,11 @@ class AnimationChannel:
         expected = 4 if self.path == "rotation" else 3
         if self.sampler.values.shape[1] != expected:
             raise ValueError("Animation output width does not match target path")
-        if self.path == "rotation":
+        if self.path == "rotation" and self.sampler.interpolation == "CUBICSPLINE":
+            # Validate values only. Tangents are derivatives, not unit quaternions.
+            for value in self.sampler.values[1::3]:
+                normalize(value)
+        if self.path == "rotation" and self.sampler.interpolation != "CUBICSPLINE":
             values = np.array([normalize(value) for value in self.sampler.values])
             object.__setattr__(
                 self,

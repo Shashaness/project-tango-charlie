@@ -436,6 +436,22 @@ class Renderer:
         def line(start, end, color):
             vertices.extend([(*start, *color), (*end, *color)])
 
+        if getattr(self.vehicle, "anchor_debug", False):
+            from game.reference_anchors import positions
+
+            for name, local in positions(self.vehicle).items():
+                point = self.vehicle.orientation @ local + self.vehicle.position
+                color = (
+                    (1, 0.7, 0)
+                    if name.startswith("TC_CONTACT_")
+                    else (0.2, 0.7, 1)
+                    if name.startswith("TC_THRUST_")
+                    else (1, 0.2, 0.4)
+                    if name.startswith(("TC_BODY_", "TC_HULL_"))
+                    else (0.3, 1, 0.3)
+                )
+                for axis in np.eye(3) * 0.2:
+                    line(point - axis, point + axis, color)
         systems = [self.combat] + [enemy.combat for enemy in self.world.enemies]
         for missile in (m for system in systems for m in system.missiles):
             self.shader.set_matrix("model", missile.model_matrix())

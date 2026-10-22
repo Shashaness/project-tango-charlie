@@ -1,0 +1,625 @@
+{
+  "blender": "5.0.1",
+  "consistency": {
+    "errors": [],
+    "warnings": [
+      {
+        "action": "TC_VTOLToBattledroid",
+        "node": "RightIntakeSurface21",
+        "channel": "scale",
+        "frames": [
+          116.0,
+          119.0
+        ],
+        "warning": "scale zero crossing"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "node": "RightIntakeSurface21",
+        "channel": "scale",
+        "frames": [
+          130.0,
+          144.0
+        ],
+        "warning": "scale step 0.3059 scale zero crossing"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "node": "RightIntakeSurface21",
+        "channel": "scale",
+        "frames": [
+          154.0,
+          157.0
+        ],
+        "warning": "scale zero crossing"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "node": "RightIntakeSurface22",
+        "channel": "scale",
+        "frames": [
+          116.0,
+          119.0
+        ],
+        "warning": "scale zero crossing"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "node": "RightIntakeSurface22",
+        "channel": "scale",
+        "frames": [
+          130.0,
+          144.0
+        ],
+        "warning": "scale step 0.3059 scale zero crossing"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "node": "RightIntakeSurface22",
+        "channel": "scale",
+        "frames": [
+          159.0,
+          162.0
+        ],
+        "warning": "scale zero crossing"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "node": "RightIntakeSurface23",
+        "channel": "scale",
+        "frames": [
+          130.0,
+          144.0
+        ],
+        "warning": "scale step 0.3059 scale zero crossing"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "node": "RightIntakeSurface23",
+        "channel": "scale",
+        "frames": [
+          154.0,
+          157.0
+        ],
+        "warning": "scale zero crossing"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "node": "RightIntakeSurface21",
+        "channel": "scale",
+        "frames": [
+          73.0,
+          76.0
+        ],
+        "warning": "scale zero crossing"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "node": "RightIntakeSurface21",
+        "channel": "scale",
+        "frames": [
+          86.0,
+          100.0
+        ],
+        "warning": "scale step 0.3059 scale zero crossing"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "node": "RightIntakeSurface21",
+        "channel": "scale",
+        "frames": [
+          111.0,
+          114.0
+        ],
+        "warning": "scale zero crossing"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "node": "RightIntakeSurface22",
+        "channel": "scale",
+        "frames": [
+          68.0,
+          71.0
+        ],
+        "warning": "scale zero crossing"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "node": "RightIntakeSurface22",
+        "channel": "scale",
+        "frames": [
+          86.0,
+          100.0
+        ],
+        "warning": "scale step 0.3059 scale zero crossing"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "node": "RightIntakeSurface22",
+        "channel": "scale",
+        "frames": [
+          111.0,
+          114.0
+        ],
+        "warning": "scale zero crossing"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "node": "RightIntakeSurface23",
+        "channel": "scale",
+        "frames": [
+          73.0,
+          76.0
+        ],
+        "warning": "scale zero crossing"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "node": "RightIntakeSurface23",
+        "channel": "scale",
+        "frames": [
+          86.0,
+          100.0
+        ],
+        "warning": "scale step 0.3059 scale zero crossing"
+      },
+      {
+        "action": "TC_FighterToVTOL",
+        "frame": 1.0,
+        "nodes": [
+          "LeftWingSurface6",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_FighterToVTOL",
+        "frame": 1.0,
+        "nodes": [
+          "RightWingSurface19",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_FighterToVTOL",
+        "frame": 91.0,
+        "nodes": [
+          "LeftWingSurface6",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_FighterToVTOL",
+        "frame": 91.0,
+        "nodes": [
+          "RightWingSurface19",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_FighterToVTOL",
+        "frame": 181.0,
+        "nodes": [
+          "LeftWingSurface6",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_FighterToVTOL",
+        "frame": 181.0,
+        "nodes": [
+          "RightWingSurface19",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToFighter",
+        "frame": 1.0,
+        "nodes": [
+          "LeftWingSurface6",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToFighter",
+        "frame": 1.0,
+        "nodes": [
+          "RightWingSurface19",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToFighter",
+        "frame": 91.0,
+        "nodes": [
+          "LeftWingSurface6",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToFighter",
+        "frame": 91.0,
+        "nodes": [
+          "RightWingSurface19",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToFighter",
+        "frame": 181.0,
+        "nodes": [
+          "LeftWingSurface6",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToFighter",
+        "frame": 181.0,
+        "nodes": [
+          "RightWingSurface19",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "frame": 1.0,
+        "nodes": [
+          "LeftWingSurface6",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "frame": 1.0,
+        "nodes": [
+          "RightWingSurface19",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "frame": 115.0,
+        "nodes": [
+          "FuselageSurface1",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "frame": 115.0,
+        "nodes": [
+          "FuselageSurface1",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "frame": 115.0,
+        "nodes": [
+          "LeftWingSurface6",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "frame": 115.0,
+        "nodes": [
+          "RightWingSurface19",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "frame": 229.0,
+        "nodes": [
+          "FuselageSurface1",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "frame": 229.0,
+        "nodes": [
+          "FuselageSurface1",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_VTOLToBattledroid",
+        "frame": 229.0,
+        "nodes": [
+          "LeftWingSurface6",
+          "RightWingSurface19"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "frame": 1.0,
+        "nodes": [
+          "FuselageSurface1",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "frame": 1.0,
+        "nodes": [
+          "FuselageSurface1",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "frame": 1.0,
+        "nodes": [
+          "LeftWingSurface6",
+          "RightWingSurface19"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "frame": 115.0,
+        "nodes": [
+          "FuselageSurface1",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "frame": 115.0,
+        "nodes": [
+          "FuselageSurface1",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "frame": 115.0,
+        "nodes": [
+          "LeftWingSurface6",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "frame": 115.0,
+        "nodes": [
+          "RightWingSurface19",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "frame": 229.0,
+        "nodes": [
+          "LeftWingSurface6",
+          "LeftUpperLegSurface11"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      },
+      {
+        "action": "TC_BattledroidToVTOL",
+        "frame": 229.0,
+        "nodes": [
+          "RightWingSurface19",
+          "RightUpperLegSurface11.001"
+        ],
+        "warning": "major-shell AABB overlap; inspect visually (not exact collision)"
+      }
+    ]
+  },
+  "inventory": {
+    "BD_Idle": {
+      "frames": [
+        1.0,
+        241.0
+      ],
+      "slots": 36,
+      "curves": 360,
+      "keys": 17640
+    },
+    "BD_Run": {
+      "frames": [
+        1.0,
+        91.0
+      ],
+      "slots": 36,
+      "curves": 360,
+      "keys": 6840
+    },
+    "BD_Walk": {
+      "frames": [
+        1.0,
+        121.0
+      ],
+      "slots": 36,
+      "curves": 360,
+      "keys": 9000
+    },
+    "FIGHTER_Rest": {
+      "frames": [
+        0.0,
+        1.0
+      ],
+      "slots": 68,
+      "curves": 680,
+      "keys": 680
+    },
+    "TC_BattledroidToVTOL": {
+      "frames": [
+        1.0,
+        229.0
+      ],
+      "slots": 68,
+      "curves": 680,
+      "keys": 8685
+    },
+    "TC_FighterToVTOL": {
+      "frames": [
+        1.0,
+        181.0
+      ],
+      "slots": 68,
+      "curves": 680,
+      "keys": 2980
+    },
+    "TC_Pose_Battledroid": {
+      "frames": [
+        1.0,
+        2.0
+      ],
+      "slots": 68,
+      "curves": 680,
+      "keys": 1360
+    },
+    "TC_Pose_Fighter": {
+      "frames": [
+        1.0,
+        2.0
+      ],
+      "slots": 68,
+      "curves": 680,
+      "keys": 1360
+    },
+    "TC_Pose_VTOL": {
+      "frames": [
+        1.0,
+        2.0
+      ],
+      "slots": 68,
+      "curves": 680,
+      "keys": 1360
+    },
+    "TC_VTOLToBattledroid": {
+      "frames": [
+        1.0,
+        229.0
+      ],
+      "slots": 68,
+      "curves": 680,
+      "keys": 8685
+    },
+    "TC_VTOLToFighter": {
+      "frames": [
+        1.0,
+        181.0
+      ],
+      "slots": 68,
+      "curves": 680,
+      "keys": 2980
+    }
+  },
+  "editable_nodes": [
+    "Cockpit",
+    "Fuselage",
+    "FuselageSurface1",
+    "GunMount",
+    "Head",
+    "LeftEngine",
+    "LeftEngineExhaust",
+    "LeftFoot",
+    "LeftForearm",
+    "LeftHand",
+    "LeftIntake",
+    "LeftIntakeSurface10",
+    "LeftIntakeSurface8",
+    "LeftIntakeSurface9",
+    "LeftLowerLeg",
+    "LeftShoulder",
+    "LeftTail",
+    "LeftUpperArm",
+    "LeftUpperLeg",
+    "LeftWing",
+    "MissileLeft01",
+    "MissileLeft02",
+    "MissileRight01",
+    "MissileRight02",
+    "Nose",
+    "RightEngine",
+    "RightEngineExhaust",
+    "RightFoot",
+    "RightForearm",
+    "RightHand",
+    "RightIntake",
+    "RightIntakeSurface21",
+    "RightIntakeSurface22",
+    "RightIntakeSurface23",
+    "RightLowerLeg",
+    "RightShoulder",
+    "RightTail",
+    "RightUpperArm",
+    "RightUpperLeg",
+    "RightWing",
+    "TC167Root",
+    "TorsoCore",
+    "VerticalTail"
+  ],
+  "runtime_pose_bridge": {
+    "endpoint_errors": {
+      "TC_FighterToVTOL:FIGHTER": 0.0,
+      "TC_FighterToVTOL:VTOL": 2.936408072251595e-08,
+      "TC_VTOLToFighter:VTOL": 2.936408072251595e-08,
+      "TC_VTOLToFighter:FIGHTER": 0.0,
+      "TC_VTOLToBattledroid:VTOL": 2.936408072251595e-08,
+      "TC_VTOLToBattledroid:BATTLEDROID": 8.23469525901288e-09,
+      "TC_BattledroidToVTOL:BATTLEDROID": 8.23469525901288e-09,
+      "TC_BattledroidToVTOL:VTOL": 2.936408072251595e-08
+    },
+    "roundtrip_errors": {
+      "FIGHTER": 0.0,
+      "VTOL": 0.0,
+      "BATTLEDROID": 0.0
+    },
+    "python_configuration_errors": {
+      "FIGHTER": {},
+      "VTOL": {},
+      "BATTLEDROID": {}
+    }
+  },
+  "protected_sha256": {
+    "assets/blender/TC167.blend": "91b61a4f2c98b9c3e6cacb09e5076f0bc3d83c376cb7c5f531c2541cab545d27",
+    "assets/blender/TC167_Animated.blend": "4f80d004a51a9a03afa453ca26d8daa821d7f05434afe070f9a38d8506d804ae",
+    "assets/blender/TC167_Complete.blend": "16fef52b57305ce1cf48eb22bb6d282c843539835015b66cda1d4b504c53f9de",
+    "assets/models/vehicles/tc167.glb": "4683bcc9547b1effdb2ec519bbd37c02e3fc3a1eca9f2d9c0fbd9940881fd19e",
+    "assets/models/vehicles/tc167_animated.glb": "7a42ef62d960e35e9280823f7a314e1b6c20007332d3ee6292a974597e27ab17",
+    "assets/models/vehicles/tc167_complete.glb": "22b55efc62b33d3449707b7020d09439e1b70166b9d047d67756a8643c720133"
+  },
+  "limitations": [
+    "Background Blender evaluation; interactive visual review remains manual.",
+    "Overlap warnings are conservative AABBs on five major shells at three clip times.",
+    "Runtime configuration ownership remains in Python; candidate generation does not install it."
+  ],
+  "blender_integration_tests": {
+    "tests": 9,
+    "failures": 0,
+    "errors": 0,
+    "details": []
+  }
+}

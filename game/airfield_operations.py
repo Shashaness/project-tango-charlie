@@ -131,4 +131,10 @@ class AirfieldOperations:
         Returns:
             Three XYZ wheel positions in meters.
         """
-        return np.asarray(self.parameters.wheel_points) @ vehicle.orientation.T + vehicle.position
+        from game.reference_anchors import authored, positions
+
+        if authored(vehicle):
+            points = np.asarray(list(positions(vehicle, "TC_CONTACT_FIGHTER_").values()))
+        else:
+            points = np.asarray(self.parameters.wheel_points)
+        return points @ vehicle.orientation.T + vehicle.position

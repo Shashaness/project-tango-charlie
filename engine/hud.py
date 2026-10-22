@@ -66,6 +66,7 @@ FONT = dict(
     )
 )
 
+FONT["_"] = "000/000/000/000/111"
 FONT["/"] = "001/001/010/100/100"
 FONT["+"] = "000/010/111/010/000"
 FONT[":"] = "000/010/000/010/000"
@@ -311,6 +312,10 @@ def instrument_groups(vehicle, fcc=None, debug=False):
                     f"ANIM {animator.blend:.2f}",
                 )
             )
+    if getattr(vehicle, "animation_debug", False) and transformation is not None:
+        right.append(getattr(transformation, "diagnostics", "Legacy Python pose authority").upper())
+        for error in getattr(transformation, "errors", []):
+            right.append("ANIM ERROR " + error.upper())
     return dict(left=left, right=right, warnings=warnings, debug=detail, airfield=airfield)
 
 

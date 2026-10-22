@@ -234,13 +234,19 @@ class GroundEnvironment:
         Returns:
             Pair of lower and upper XYZ offsets in meters relative to the vehicle origin.
         """
+        from game.reference_anchors import authored, positions
+
+        c = authored(vehicle)
+        if c:
+            modes = {c.source, c.target} if c.active else {c.configuration}
+            prefix = tuple("TC_HULL_" + m.name + "_" for m in modes)
+            points = np.asarray(list(positions(vehicle, prefix).values())) @ vehicle.orientation.T
+            return points.min(axis=0), points.max(axis=0)
         if vehicle.flight_state.mode is VehicleMode.FIGHTER:
             from game.fighter_ground import fighter_vertices
 
             points = fighter_vertices() @ vehicle.orientation.T
             return points.min(axis=0), points.max(axis=0)
-        from game.battledroid_physics import BATTLEDROID
-
         if vehicle.flight_state.mode is VehicleMode.BATTLEDROID:
             extent = np.abs(vehicle.orientation) @ np.array((1.4, 3.2, 1.2))
         else:

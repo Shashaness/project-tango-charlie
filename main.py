@@ -18,6 +18,13 @@ def main():
         action="store_true",
         help="disable visual Battledroid gait; physics unchanged",
     )
+    parser.add_argument(
+        "--legacy-animation",
+        action="store_true",
+        help="use original Python poses and legacy TC167 model",
+    )
+    parser.add_argument("--animation-debug", action="store_true")
+    parser.add_argument("--anchor-debug", action="store_true")
     parser.add_argument("--enemies", type=int, default=AI_ENEMY_COUNT)
     parser.add_argument(
         "--vehicle-model", help="TC167 GLB with the existing hierarchy and optional BD clips"
@@ -125,6 +132,8 @@ def main():
         )
     except ValueError as error:
         parser.error(str(error))
+    if args.no_gltf_animation and not args.legacy_animation:
+        parser.error("--no-gltf-animation requires --legacy-animation")
     game = Game(
         title=PROJECT_TITLE,
         enemy_count=args.enemies,
@@ -133,6 +142,9 @@ def main():
         terrain_config=terrain_config,
         vehicle_model_path=args.vehicle_model,
         gltf_animation=not args.no_gltf_animation,
+        legacy_animation=args.legacy_animation,
+        animation_debug=args.animation_debug,
+        anchor_debug=args.anchor_debug,
     )
     # Normal atmosphere startup remains in the hangar; F2 retains airborne recovery.
     if args.battledroid_test:

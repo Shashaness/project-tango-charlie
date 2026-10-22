@@ -40,8 +40,9 @@ class BattledroidAnimationController:
             name: AnimationClip.load(asset_path("animations/" + name + ".json"))
             for name in ("landing", "recovery", "idle", "stopping")
         }
+        self.authored = getattr(self.transformation, "authority", None) == "GLB"
         names = set().union(*(clip.tracks.keys() for clip in self.clips.values()))
-        self.nodes = {name: self.model.find_node(name) for name in names}
+        self.nodes = {} if self.authored else {name: self.model.find_node(name) for name in names}
         self.state = "IDLE"
         self.time = 0.0
         self.total_time = 0.0
@@ -60,6 +61,8 @@ class BattledroidAnimationController:
         self._enabled = False
 
     def clear_layer(self):
+        if self.authored:
+            return
         # Called BEFORE canonical transformation and procedural gait evaluation.
         self.native_player.clear()
         for node in self._native_attachments:
@@ -91,6 +94,8 @@ class BattledroidAnimationController:
         """
         if not math.isfinite(dt) or dt < 0:
             raise ValueError("Invalid animation dt")
+        if self.authored:
+            return
         c = self.transformation
         completed = self._was_transforming and not c.active
         self._was_transforming = c.active
@@ -252,6 +257,8 @@ class BattledroidAnimationController:
 
     def update(self):
         """Compose the prepared local animation layer and refresh model world matrices."""
+        if self.authored:
+            return
         if self.locomotion.native_active:
             self._apply_native()
             return

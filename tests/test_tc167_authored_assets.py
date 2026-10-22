@@ -101,8 +101,8 @@ class AuthoredAssetTests(unittest.TestCase):
                 np.testing.assert_array_equal(node.local_matrix, matrix)
 
     def test_full_game_uses_authored_clips_without_changing_physics(self):
-        native = Game(enemy_count=0, vehicle_model_path=ANIMATED)
-        fallback = Game(enemy_count=0, vehicle_model_path=ANIMATED, gltf_animation=False)
+        native = Game(legacy_animation=True, enemy_count=0, vehicle_model_path=ANIMATED)
+        fallback = Game(legacy_animation=True, enemy_count=0, vehicle_model_path=ANIMATED, gltf_animation=False)
         for game in (native, fallback):
             game.setup_battledroid_test("ground")
             game.input.pitch = -1

@@ -38,6 +38,9 @@ class Game:
         terrain_config=None,
         vehicle_model_path=None,
         gltf_animation=True,
+        legacy_animation=False,
+        animation_debug=False,
+        anchor_debug=False,
     ):
         """Create the window, shared game systems, and initial development spawn.
 
@@ -62,14 +65,23 @@ class Game:
         self.player_vehicle = PlayerVehicle()
         self.player_vehicle.geographic_frame = self.world.terrain.frame
         self.player_vehicle.unit_designation = PLAYER_UNIT_DESIGNATION
+        self.player_vehicle.animation_debug = animation_debug
+        self.player_vehicle.anchor_debug = anchor_debug
         model = None
+        if vehicle_model_path is None and not legacy_animation:
+            from engine.asset_paths import asset_path
+
+            vehicle_model_path = asset_path("models/vehicles/tc167_authoring.glb")
         if vehicle_model_path is not None:
             from engine.gltf_loader import load_glb
 
             model = load_glb(vehicle_model_path)
-        self.player_vehicle.transformation = TransformationController(
-            self.player_vehicle, model=model
-        )
+        controller = TransformationController
+        if not legacy_animation:
+            from game.authored_transformation import AuthoredTransformationController
+
+            controller = AuthoredTransformationController
+        self.player_vehicle.transformation = controller(self.player_vehicle, model=model)
         self.player_vehicle.locomotion = BattledroidLocomotionAnimator(
             self.player_vehicle.transformation, enabled=locomotion_animation
         )
@@ -213,7 +225,6 @@ class Game:
         Args:
             case: Named development scenario to initialize.
         """
-        from game.battledroid_physics import BATTLEDROID
         from game.flight_state import FlightStatus
 
         v = self.player_vehicle
@@ -225,7 +236,9 @@ class Game:
         v.up[:] = (0, 1, 0)
         v.throttle = v.engine_throttle = 0.0
         v.velocity[:] = 0.0
-        v.position[:] = (0, BATTLEDROID.foot_clearance, 0)
+        from game.battledroid_physics import contact_clearance
+
+        v.position[:] = (0, contact_clearance(v), 0)
         v.flight_state.status = FlightStatus.GROUNDED
         if case == "landing":
             v.position[1] = 12.0
@@ -233,7 +246,7 @@ class Game:
             v.throttle = v.engine_throttle = 0.5
             v.flight_state.status = FlightStatus.FLYING
         elif case == "skid":
-            v.position[1] = BATTLEDROID.foot_clearance + 0.5
+            v.position[1] = contact_clearance(v) + 0.5
             # Exercise sliding on the clear airfield rather than through new city colliders.
             v.position[2] = 2500.0
             v.velocity[:] = (40, -2, 0)
@@ -250,7 +263,7 @@ class Game:
         """
         from game.atmospheric_physics import PARAMETERS
         from game.flight_state import FlightStatus
-        from game.vtol_ground import foot_geometry
+        from game.vtol_ground import contact_clearance
         from game.vtol_physics import VTOL
 
         v = self.player_vehicle
@@ -266,7 +279,7 @@ class Game:
         v.throttle = v.engine_throttle = 0.0
         v.thrust_vector = 1.0
         v.velocity[:] = 0.0
-        v.position[:] = (0, foot_geometry()[1], 0)
+        v.position[:] = (0, contact_clearance(v), 0)
         v.flight_state.status = FlightStatus.GROUNDED
         if case == "landing":
             v.position[1] += 3.0

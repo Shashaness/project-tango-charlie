@@ -1,0 +1,17 @@
+{
+  "blender_glb_world_matrix_errors": {
+    "TC_Pose_Fighter": 4.988152162432868e-07,
+    "TC_Pose_VTOL": 5.446068218617484e-07,
+    "TC_Pose_Battledroid": 4.988152162432868e-07,
+    "TC_FighterToVTOL": 5.446068218617484e-07,
+    "TC_VTOLToFighter": 7.98483527297833e-07,
+    "TC_VTOLToBattledroid": 1.5331950137739692e-06,
+    "TC_BattledroidToVTOL": 1.4992830723661865e-06,
+    "BD_Idle": 4.988152162432868e-07,
+    "BD_Walk": 1.071313110334593e-06,
+    "BD_Run": 6.405366141937208e-07
+  },
+  "new_articulated_mesh_roundtrip": true,
+  "endpoint_sync_preserves_interiors": true,
+  "saved_authoring_asset_unchanged_by_validation": true
+}

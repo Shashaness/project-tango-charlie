@@ -40,6 +40,12 @@ class VTOLGroundContact:
         g.depth = 0
         self.height = self.ground_height(v.position)
         self.clearance = contact_clearance(v) + (self.height or 0.0)
+        from game.reference_anchors import authored, floor
+
+        if authored(v):
+            self.clearance = floor(v, self.ground_height)
+            if self.clearance is None:
+                self.clearance = contact_clearance(v)
         if self.height is None and v.flight_state.status is FlightStatus.GROUNDED:
             v.flight_state.status = FlightStatus.FLYING
         self.supported = (
@@ -95,7 +101,11 @@ class VTOLGroundContact:
         v = self.vehicle
         g = v.ground_contact
         if self.height is not None:
-            self.clearance = contact_clearance(v) + self.height
+            from game.reference_anchors import authored, floor
+
+            self.clearance = (
+                floor(v, self.ground_height) if authored(v) else contact_clearance(v) + self.height
+            )
             resolve_contact(
                 v,
                 self.clearance,
@@ -111,12 +121,22 @@ class VTOLGroundContact:
             )
             if v.flight_state.status is FlightStatus.CRASHED:
                 self.fcc.clear_hover()
-        feet, _ = foot_geometry()
-        heights = [
-            float((p @ v.orientation.T)[:, 1].min() + v.position[1] - (self.height or 0.0))
-            for p in feet
-        ]
-        g.left_foot_height, g.right_foot_height = heights
+        from game.reference_anchors import authored, positions
+
+        if authored(v):
+            points = positions(v, "TC_CONTACT_VTOL_").values()
+            heights = sorted(
+                float((v.orientation @ p)[1] + v.position[1] - (self.height or 0)) for p in points
+            )
+            g.left_foot_height = heights[0]
+            g.right_foot_height = heights[-1]
+        else:
+            feet, _ = foot_geometry()
+            heights = [
+                float((p @ v.orientation.T)[:, 1].min() + v.position[1] - (self.height or 0.0))
+                for p in feet
+            ]
+            g.left_foot_height, g.right_foot_height = heights
         g.clearance = self.clearance - (self.height or 0.0)
         g.landing_approach = (
             v.flight_state.status is FlightStatus.FLYING
