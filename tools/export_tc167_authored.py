@@ -13,7 +13,6 @@ import tempfile
 from pathlib import Path
 
 import bpy
-from mathutils import Matrix
 
 PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT))
@@ -37,59 +36,32 @@ def export(blend, output, install=False):
     controls = {}
     exec(bpy.data.texts["TC167_Action_Controls.py"].as_string(), controls)
     if install:
-        controls["choose"]("TC_Pose_Fighter")
+        controls["install_identity_baseline"]()
+        controls["choose"]("TC_Pose_Fighter", editing=False)
         bpy.context.view_layer.update()
         controls["create_references"]()
-        bpy.ops.wm.save_as_mainfile(filepath=str(blend.resolve()))
     report = controls["validate"]()
-    print("M21.4 VALIDATION", json.dumps(report))
+    print("TC167 VALIDATION", json.dumps(report))
     if report["errors"]:
         raise ValueError("Validate for Game failed; inspect reported Action/reference errors")
-    # Set neutral local reference transforms before exporter discovers all slotted Actions.
-    # The saved file is not altered by ordinary export.
-    for obj in bpy.context.scene.objects:
-        if obj.animation_data:
-            obj.animation_data.action = None
-            obj.animation_data.use_nla = False
-        basis = controls["manifest"]()["rest"].get(obj.name)
-        if basis is not None:
-            obj.matrix_basis = Matrix(basis)
-        obj.hide_set(False)
-    bpy.context.scene.frame_set(0)
-    bpy.context.view_layer.update()
-    bpy.ops.object.select_all(action="SELECT")
+    if install:
+        bpy.ops.wm.save_as_mainfile(filepath=str(blend.resolve()))
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="tc167-export-", dir=output.parent) as directory:
         candidate = Path(directory) / "candidate.glb"
-        bpy.ops.export_scene.gltf(
-            filepath=str(candidate.resolve()),
-            export_format="GLB",
-            use_selection=True,
-            export_animations=True,
-            export_animation_mode="ACTIONS",
-            export_merge_animation="ACTION",
-            export_force_sampling=True,
-            export_frame_step=1,
-            export_frame_range=False,
-            export_anim_slide_to_zero=True,
-            export_current_frame=False,
-            export_optimize_animation_keep_anim_object=True,
-            export_skins=False,
-            export_morph=False,
-            export_cameras=False,
-            export_lights=False,
-            export_hierarchy_flatten_objs=False,
-            export_yup=True,
-            export_materials="EXPORT",
-        )
+        if controls["export_scene_glb"](candidate.resolve()) != {"FINISHED"}:
+            raise ValueError("Blender GLB export did not finish")
         from engine.gltf_loader import load_glb
-        from game.authored_transformation import AuthoredTransformationController
+        from game.authored_transformation import REQUIRED_ACTIONS, AuthoredTransformationController
 
         model = load_glb(candidate)
         AuthoredTransformationController(model=model)
+        extra = set(model.animations) - set(REQUIRED_ACTIONS)
+        if extra:
+            raise ValueError("Unexpected exported Actions: " + ", ".join(sorted(extra)))
         candidate.replace(output)
     print(
-        "M21.4 EXPORTED", [(c.name, c.duration, len(c.channels)) for c in model.animations.values()]
+        "TC167 EXPORTED", [(c.name, c.duration, len(c.channels)) for c in model.animations.values()]
     )
     return model
 

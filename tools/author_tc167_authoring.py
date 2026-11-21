@@ -75,7 +75,8 @@ def embed():
     text.write((PROJECT / "tools/tc167_authoring_controls.py").read_text())
     namespace = {}
     exec(text.as_string(), namespace)
-    namespace["choose"]("TC_Pose_Fighter")
+    namespace["install_identity_baseline"]()
+    namespace["choose"]("TC_Pose_Fighter", editing=False)
     return namespace
 
 

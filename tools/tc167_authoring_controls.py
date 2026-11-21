@@ -4,6 +4,7 @@ import hashlib
 import itertools
 import json
 import math
+import uuid
 from functools import lru_cache
 
 import bpy
@@ -34,13 +35,14 @@ def manifest():
 
 
 def bags(action, node):
-    slots = [s for s in action.slots if s.identifier == "OB" + node]
+    slot = slot_for(action, node)
+    if slot is None:
+        return []
     return [
-        b
+        bag
         for layer in action.layers
         for strip in layer.strips
-        for b in strip.channelbags
-        if any(s.handle == b.slot_handle for s in slots)
+        if (bag := strip.channelbag(slot)) is not None
     ]
 
 
@@ -48,15 +50,25 @@ def channels(action, node):
     return {(c.data_path, c.array_index): c for bag in bags(action, node) for c in bag.fcurves}
 
 
-def values(action, node, path, frame):
-    basis = Matrix(manifest()["rest"][node])
-    loc, quat, scale = basis.decompose()
-    fallback = {"location": loc, "rotation_quaternion": quat, "scale": scale}[path]
+def reference_component(node, path, index):
+    return Matrix(manifest()["rest"][node]).decompose()[list(PATHS).index(path)][index]
+
+
+def pose_at(action, node, frame, reference=None):
     curves = channels(action, node)
-    return [
-        curves[path, i].evaluate(frame) if (path, i) in curves else fallback[i]
-        for i in range(PATHS[path])
-    ]
+    if reference is None:
+        reference = dict(zip(PATHS, Matrix(manifest()["rest"][node]).decompose()))
+    return {
+        path: [
+            curves[path, i].evaluate(frame) if (path, i) in curves else fallback
+            for i, fallback in enumerate(reference[path])
+        ]
+        for path in PATHS
+    }
+
+
+def values(action, node, path, frame):
+    return pose_at(action, node, frame)[path]
 
 
 def difference(path, left, right):
@@ -80,22 +92,7 @@ def ensure_curve(action, node, path, index):
     slot = next((s for s in action.slots if s.identifier == "OB" + node), None)
     if slot is None:
         slot = action.slots.new(id_type="OBJECT", name=node)
-        # Preserve multi-object exporter discovery for a newly repaired slot.
-        obj = bpy.data.objects[node]
-        obj.animation_data_create()
-        repaired = False
-        for track in obj.animation_data.nla_tracks:
-            for nla_strip in track.strips:
-                if nla_strip.action == action and nla_strip.action_slot is None:
-                    nla_strip.action_slot = slot
-                    repaired = True
-        if not repaired:
-            track = obj.animation_data.nla_tracks.new()
-            track.name = action.name + " repaired slot"
-            track.mute = True
-            nla_strip = track.strips.new(action.name, int(action.frame_start), action)
-            nla_strip.action_slot = slot
-        obj.animation_data.use_nla = False
+        ensure_export_binding(bpy.data.objects[node], action, slot)
     layer = action.layers[0] if action.layers else action.layers.new("Configuration endpoints")
     strip = layer.strips[0] if layer.strips else layer.strips.new(type="KEYFRAME")
     bag = strip.channelbag(slot, ensure=True)
@@ -113,74 +110,213 @@ def write_key(curve, frame, value):
         # FAST insertion is sorted and deliberately keeps neighboring handles intact.
 
 
-def choose(name):
+def slot_for(action, node):
+    return next((slot for slot in action.slots if slot.identifier == "OB" + node), None)
+
+
+def basis_from_pose(pose):
+    return Matrix.LocRotScale(
+        Vector(pose["location"]), Quaternion(pose["rotation_quaternion"]), Vector(pose["scale"])
+    )
+
+
+def reference_action(name):
+    return bpy.data.actions[CONFIGURATIONS["BATTLEDROID"]] if name.startswith("BD_") else None
+
+
+def choose(name, editing=True):
+    """Reset all managed components before evaluating the selected Action."""
+    if bpy.context.mode != "OBJECT":
+        raise ValueError("Return to Object Mode before switching Actions")
     action = bpy.data.actions[name]
-    for obj in bpy.context.scene.objects:
-        node = obj.name
-        obj.animation_data_create()
-        slot = next((s for s in action.slots if s.identifier == "OB" + node), None)
-        obj.animation_data.action = action if slot else None
-        if slot:
-            obj.animation_data.action_slot = slot
-        obj.animation_data.use_nla = False
-        if not slot and node in manifest()["rest"]:
-            if name.startswith("BD_"):
-                pose = bpy.data.actions[CONFIGURATIONS["BATTLEDROID"]]
-                obj.matrix_basis = Matrix.LocRotScale(
-                    Vector(values(pose, node, "location", pose.frame_start)),
-                    Quaternion(values(pose, node, "rotation_quaternion", pose.frame_start)),
-                    Vector(values(pose, node, "scale", pose.frame_start)),
-                )
-            else:
-                obj.matrix_basis = Matrix(manifest()["rest"][node])
-    for config, pose in CONFIGURATIONS.items():
-        if name == pose:
-            bpy.context.scene["tc167_configuration"] = config
     scene = bpy.context.scene
+    scene.tool_settings.use_keyframe_insert_auto = False
+    configuration = next((cfg for cfg, clip in CONFIGURATIONS.items() if clip == name), None)
+    reference = reference_action(name)
+    for node, rest in manifest()["rest"].items():
+        obj = scene.objects.get(node)
+        if obj is None:
+            continue
+        slot = slot_for(action, node)
+        animation = obj.animation_data
+        if slot or animation:
+            animation = obj.animation_data_create()
+            animation.action = None
+            animation.use_nla = False
+        obj.rotation_mode = "QUATERNION"
+        fallback = (
+            basis_from_pose(pose_at(reference, node, reference.frame_start))
+            if reference
+            else Matrix(rest)
+        )
+        obj.matrix_basis = fallback
+        if editing and slot:
+            animation.action = action
+            animation.action_slot = slot
+    if configuration:
+        scene["tc167_configuration"] = configuration
+    scene["tc167_action"] = name
+    scene["tc167_editing"] = editing
+    scene["tc167_dirty"] = False
     scene.frame_start, scene.frame_end = int(action.frame_start), int(action.frame_end)
     scene.frame_set(int(action.frame_start))
+
+
+def display_preview(scene, _depsgraph=None):
+    """Evaluate a read-only preview without assigning editable Actions."""
+    if scene.get("tc167_editing", True):
+        return
+    action = bpy.data.actions.get(scene.get("tc167_action", ""))
+    if action is None:
+        return
+    frame = (
+        action.frame_start if action.name in CONFIGURATIONS.values() else scene.frame_current_final
+    )
+    for node in manifest()["rest"]:
+        if obj := scene.objects.get(node):
+            basis = sampled_basis(action, node, frame)
+            for path, value in basis.items():
+                setattr(obj, path, value)
+
+
+def sampled_basis(action, node, frame):
+    reference = reference_action(action.name)
+    defaults = pose_at(reference, node, reference.frame_start) if reference else None
+    return pose_at(action, node, frame, defaults)
+
+
+def pending_transforms(update=True):
+    scene = bpy.context.scene
+    action = bpy.data.actions.get(scene.get("tc167_action", ""))
+    if not scene.get("tc167_editing") or not action:
+        return []
+    if update:
+        bpy.context.view_layer.update()
+    result = []
+    for node in manifest()["editable"]:
+        obj = scene.objects.get(node)
+        if obj and any(
+            difference(path, getattr(obj, path), expected) > TOLERANCE
+            for path, expected in sampled_basis(action, node, scene.frame_current_final).items()
+        ):
+            result.append(node)
+    return result
 
 
 def current_configuration():
     return bpy.context.scene.get("tc167_configuration", "FIGHTER")
 
 
-def save_configuration(config):
-    """Capture all managed evaluated bases before touching any Action data."""
+def configuration_snapshot(config):
+    """Evaluate fixed hierarchy and canonical curves without rebinding scene Actions."""
     action = bpy.data.actions[CONFIGURATIONS[config]]
+    objects = bpy.context.scene.objects
+    world = {}
+
+    def matrix(obj):
+        if obj.name not in world:
+            basis = (
+                basis_from_pose(pose_at(action, obj.name, action.frame_start))
+                if obj.name in manifest()["rest"]
+                else obj.matrix_basis.copy()
+            )
+            parent = (
+                matrix(obj.parent) @ obj.matrix_parent_inverse if obj.parent else Matrix.Identity(4)
+            )
+            world[obj.name] = parent @ basis
+        return world[obj.name]
+
+    return {
+        node: {
+            **pose_at(action, node, action.frame_start),
+            "parent": objects[node].parent.name if objects[node].parent else None,
+            "world": [list(row) for row in matrix(objects[node])],
+        }
+        for node in manifest()["editable"]
+    }
+
+
+def matrix_difference(left, right):
+    return max(abs(x - y) for a, b in zip(left, right) for x, y in zip(a, b))
+
+
+def comparison():
+    snapshots = {cfg: configuration_snapshot(cfg) for cfg in CONFIGURATIONS}
+    differences = {}
+    for left, right in itertools.combinations(snapshots, 2):
+        pairs = {}
+        for node, a in snapshots[left].items():
+            b = snapshots[right][node]
+            fields = [path for path in PATHS if difference(path, a[path], b[path]) > TOLERANCE]
+            if a["parent"] != b["parent"]:
+                fields.append("parent")
+            if matrix_difference(a["world"], b["world"]) > TOLERANCE:
+                fields.append("world")
+            pairs[node] = fields
+        differences[f"{left} / {right}"] = pairs
+    return {"poses": snapshots, "differences": differences}
+
+
+def check_assignment(action, node):
+    obj = bpy.context.scene.objects.get(node)
+    if not obj or not obj.animation_data or obj.animation_data.action != action:
+        return False
+    slot = slot_for(action, node)
+    return bool(
+        slot
+        and obj.animation_data.action_slot == slot
+        and not obj.animation_data.use_nla
+        and obj.rotation_mode == "QUATERNION"
+    )
+
+
+def save_configuration(config):
+    """Capture evaluated transforms and transact only the selected canonical Action."""
+    action = bpy.data.actions[CONFIGURATIONS[config]]
+    scene = bpy.context.scene
+    if (
+        bpy.context.mode != "OBJECT"
+        or scene.get("tc167_action") != action.name
+        or not scene.get("tc167_editing")
+        or scene.frame_current_final != action.frame_start
+    ):
+        raise ValueError("Select the configuration and enter Edit Pose at its first frame")
+    errors = hierarchy_errors()
+    if errors:
+        raise ValueError(str(errors[0]))
+    if unregistered():
+        raise ValueError(
+            "Initialize unregistered articulated objects before saving: "
+            + ", ".join(obj.name for obj in unregistered())
+        )
     for node in manifest()["editable"]:
-        obj = bpy.data.objects[node]
-        if (
-            not obj.animation_data
-            or obj.animation_data.action != action
-            or not obj.animation_data.action_slot
-            or obj.animation_data.action_slot.identifier != "OB" + node
-        ):
-            raise ValueError("Select the configuration button before saving its pose")
+        if not check_assignment(action, node):
+            raise ValueError("Select the configuration again; incorrect Action or slot on " + node)
+    for name in CONFIGURATIONS.values():
+        validate_channels(bpy.data.actions[name], require_complete=True)
+    before = {cfg: configuration_snapshot(cfg) for cfg in CONFIGURATIONS}
     bpy.context.view_layer.update()
     depsgraph = bpy.context.evaluated_depsgraph_get()
     captured = {}
     for node in manifest()["editable"]:
         obj = bpy.data.objects[node]
-        basis = obj.matrix_parent_inverse.inverted() @ obj.evaluated_get(depsgraph).matrix_local
-        if not all(math.isfinite(v) for row in basis for v in row):
-            raise ValueError(node + ": non-finite transform; no configuration was saved")
-        loc, quat, scale = basis.decompose()
-        reference = Quaternion(values(action, node, "rotation_quaternion", action.frame_start))
-        if reference.dot(quat) < 0:
-            quat.negate()
-        rebuilt = Matrix.LocRotScale(loc, quat, scale)
-        if max(abs(basis[i][j] - rebuilt[i][j]) for i in range(4) for j in range(4)) > TOLERANCE:
-            raise ValueError(node + ": unsupported shear; no configuration was saved")
-        captured[node] = {
-            "location": list(loc),
-            "rotation_quaternion": list(quat),
-            "scale": list(scale),
-        }
+        evaluated = obj.evaluated_get(depsgraph)
+        pose = {path: list(getattr(evaluated, path)) for path in PATHS}
+        if not all(math.isfinite(v) for components in pose.values() for v in components):
+            raise ValueError(f"{node}: non-finite evaluated transform")
+        quaternion = Quaternion(pose["rotation_quaternion"])
+        if quaternion.magnitude < 1e-10:
+            raise ValueError(f"{node}: zero rotation quaternion")
+        quaternion.normalize()
+        reference = Quaternion(before[config][node]["rotation_quaternion"])
+        if reference.dot(quaternion) < 0:
+            quaternion.negate()
+        pose["rotation_quaternion"] = list(quaternion)
+        captured[node] = pose
     changes = []
     for node, pose in captured.items():
         for path, target in pose.items():
-            old = values(action, node, path, action.frame_start)
+            old = before[config][node][path]
             if difference(path, old, target) <= TOLERANCE:
                 continue
             changes.append(
@@ -192,22 +328,74 @@ def save_configuration(config):
                     "after": target,
                 }
             )
+    edits = []
     for change in changes:
+        curves = channels(action, change["node"])
         for i, value in enumerate(change["after"]):
-            curve = ensure_curve(action, change["node"], change["channel"], i)
-            times = {action.frame_start, action.frame_end} | {k.co.x for k in curve.keyframe_points}
-            for frame in sorted(times):
-                write_key(curve, frame, value)
+            edits.extend(
+                (key, key.co.y, value)
+                for key in curves[change["channel"], i].keyframe_points
+                if abs(key.co.y - value) > TOLERANCE
+            )
+    try:
+        for key, old, value in edits:
+            key.co.y = value
+        after = {cfg: configuration_snapshot(cfg) for cfg in CONFIGURATIONS}
+        if any(after[cfg] != before[cfg] for cfg in CONFIGURATIONS if cfg != config):
+            raise ValueError("Unrelated configuration evaluation changed; save rolled back")
+        for node, pose in captured.items():
+            if any(
+                difference(path, pose[path], after[config][node][path]) > TOLERANCE
+                for path in PATHS
+            ):
+                raise ValueError(f"{node}: saved pose did not match the captured evaluation")
+    except Exception:
+        for key, old, value in edits:
+            key.co.y = old
+        raise
     bpy.context.scene.frame_set(bpy.context.scene.frame_current)
+    scene["tc167_dirty"] = False
     return changes
+
+
+def validate_channels(action, require_complete=False, nodes=None):
+    if len(action.layers) > 1 or any(len(layer.strips) > 1 for layer in action.layers):
+        raise ValueError(f"{action.name}: use one keyframe strip for rigid-object authoring")
+    for node in manifest()["editable"] if nodes is None else nodes:
+        node_bags = bags(action, node)
+        present = channels(action, node)
+        if sum(len(bag.fcurves) for bag in node_bags) != len(present):
+            raise ValueError(f"{action.name}: duplicate animation channels for {node}")
+        for (path, index), curve in present.items():
+            if (
+                path not in PATHS
+                or index >= PATHS[path]
+                or curve.mute
+                or (curve.group is not None and curve.group.mute)
+                or curve.modifiers
+                or not curve.keyframe_points
+                or any(not math.isfinite(v) for key in curve.keyframe_points for v in key.co)
+            ):
+                raise ValueError(f"{action.name}: unsupported channel {node} {path}[{index}]")
+        if require_complete and len(present) != sum(PATHS.values()):
+            raise ValueError(f"{action.name}: incomplete TRS for {node}; inspect migration report")
 
 
 def preview(config):
     """Pure read: full proposed changes; no assignments, frame changes or key writes."""
+    errors = hierarchy_errors()
+    if errors:
+        raise ValueError(str(errors[0]))
+    if unregistered():
+        raise ValueError("Initialize unregistered articulated objects before synchronizing")
     changes = []
     pose = bpy.data.actions[CONFIGURATIONS[config]]
+    validate_channels(pose, require_complete=True)
     for name, ends in RELATIONSHIPS.items():
         action = bpy.data.actions[name]
+        if config not in ends:
+            continue
+        validate_channels(action)
         for endpoint, configuration, frame in (
             ("first", ends[0], action.frame_start),
             ("last", ends[1], action.frame_end),
@@ -239,7 +427,16 @@ def preview(config):
                             target = [-v for v in target]
                     missing = [i for i in range(width) if (path, i) not in present]
                     delta = difference(path, before, target)
-                    if missing or delta > TOLERANCE:
+                    absent_key = any(
+                        not any(abs(k.co.x - frame) < 1e-5 for k in curve.keyframe_points)
+                        for (p, i), curve in present.items()
+                        if p == path
+                    )
+                    sign_change = (
+                        path == "rotation_quaternion"
+                        and Quaternion(before).dot(Quaternion(target)) < 0
+                    )
+                    if missing or absent_key or sign_change or delta > TOLERANCE:
                         changes.append(
                             {
                                 "configuration": config,
@@ -266,13 +463,11 @@ def apply_changes(changes):
             if i in change["added_components"]:
                 # A new curve needs both endpoints; preserve the other configuration.
                 other = "last" if change["endpoint"] == "first" else "first"
-                config = RELATIONSHIPS[action.name][0 if other == "first" else 1]
-                pose = bpy.data.actions[CONFIGURATIONS[config]]
                 other_frame = action.frame_start if other == "first" else action.frame_end
                 write_key(
                     curve,
                     other_frame,
-                    values(pose, change["node"], change["channel"], pose.frame_start)[i],
+                    reference_component(change["node"], change["channel"], i),
                 )
             write_key(curve, change["frame"], value)
     bpy.context.scene.frame_set(bpy.context.scene.frame_current)
@@ -553,10 +748,34 @@ def publish(title, payload):
 class TC167_OT_clip(bpy.types.Operator):
     bl_idname = "tc167.clip"
     bl_label = "Select TC167 Action"
+    bl_options = {"UNDO"}
     action_name: bpy.props.StringProperty()
+    editing: bpy.props.BoolProperty(default=False)
+
+    def invoke(self, context, event):
+        if context.mode == "OBJECT":
+            if pending_transforms():
+                return context.window_manager.invoke_confirm(
+                    self,
+                    event,
+                    title="Discard unsaved transforms?",
+                    message="Cancel to save the pose or key the animation first.",
+                )
+            if unregistered() and self.action_name != context.scene.get("tc167_action"):
+                return context.window_manager.invoke_confirm(
+                    self,
+                    event,
+                    title="Switch with unregistered parts?",
+                    message="Unregistered parts retain their current layout until initialized.",
+                )
+        return self.execute(context)
 
     def execute(self, context):
-        choose(self.action_name)
+        try:
+            choose(self.action_name, editing=self.editing)
+        except (ValueError, KeyError) as error:
+            self.report({"ERROR"}, str(error))
+            return {"CANCELLED"}
         return {"FINISHED"}
 
 
@@ -565,16 +784,23 @@ class TC167_OT_save_configuration(bpy.types.Operator):
     bl_label = "Save Configuration Pose"
     bl_options = {"REGISTER", "UNDO"}
 
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(
+            self,
+            event,
+            title=f"Overwrite {current_configuration()} pose?",
+            message="Save current Object Mode transforms to the selected configuration Action?",
+        )
+
     def execute(self, context):
         try:
             changes = save_configuration(current_configuration())
         except ValueError as error:
             self.report({"ERROR"}, str(error))
             return {"CANCELLED"}
-        publish("Saved configuration channels", changes)
-        self.report(
-            {"INFO"}, f"Saved {len(changes)} node/channel groups; details: TC167_Last_Report.json"
-        )
+        updated = sorted({change["node"] for change in changes})
+        publish("Saved configuration channels", {"objects": updated, "changes": changes})
+        self.report({"INFO"}, f"Saved {len(updated)} objects. See TC167_Last_Report.json")
         return {"FINISHED"}
 
 
@@ -583,7 +809,11 @@ class TC167_OT_preview(bpy.types.Operator):
     bl_label = "Preview Endpoint Changes"
 
     def execute(self, context):
-        changes = preview(current_configuration())
+        try:
+            changes = preview(current_configuration())
+        except (ValueError, KeyError) as error:
+            self.report({"ERROR"}, str(error))
+            return {"CANCELLED"}
         publish("Endpoint preview", changes)
         self.report({"INFO"}, f"{len(changes)} proposed changes in TC167_Last_Report.json")
         return {"FINISHED"}
@@ -597,7 +827,11 @@ class TC167_OT_sync(bpy.types.Operator):
 
     def invoke(self, context, event):
         self._config = current_configuration()
-        self._plan = preview(self._config)
+        try:
+            self._plan = preview(self._config)
+        except (ValueError, KeyError) as error:
+            self.report({"ERROR"}, str(error))
+            return {"CANCELLED"}
         self._signature = json.dumps(self._plan, sort_keys=True)
         publish("Confirm endpoint synchronization", self._plan)
         self.confirmed = False
@@ -612,6 +846,7 @@ class TC167_OT_sync(bpy.types.Operator):
                 text=f"{change['action']} | {change['endpoint']} {change['frame']:g} | "
                 f"{change['node']} {change['channel']} Δ={change['difference']:.5g}"
             )
+        layout.label(text="Curves adjoining a changed endpoint will evaluate differently.")
         layout.prop(
             self, "confirmed", text="Apply these endpoint changes (interior keys remain unchanged)"
         )
@@ -620,16 +855,28 @@ class TC167_OT_sync(bpy.types.Operator):
         if not self.confirmed or not hasattr(self, "_plan"):
             self.report({"WARNING"}, "Use the confirmation dialog; no keys changed")
             return {"CANCELLED"}
+        try:
+            fresh = preview(self._config)
+        except (ValueError, KeyError) as error:
+            self.report({"ERROR"}, str(error))
+            return {"CANCELLED"}
         if (
             current_configuration() != self._config
-            or json.dumps(preview(self._config), sort_keys=True) != self._signature
+            or json.dumps(fresh, sort_keys=True) != self._signature
         ):
             self.report({"ERROR"}, "Preview is stale; preview again")
             return {"CANCELLED"}
         apply_changes(self._plan)
         publish(
             "Applied endpoint synchronization",
-            {"changes": self._plan, "warnings": motion_warnings()},
+            {
+                "changes": self._plan,
+                "warnings": [
+                    "Changing an endpoint changes interpolation on the adjoining segment. "
+                    "Existing interior keys and stored handles were preserved.",
+                    *motion_warnings(),
+                ],
+            },
         )
         self.report(
             {"INFO"}, f"Synchronized {len(self._plan)} groups; inspect motion warnings in report"
@@ -639,11 +886,26 @@ class TC167_OT_sync(bpy.types.Operator):
 
 class TC167_OT_validate(bpy.types.Operator):
     bl_idname = "tc167.validate_configuration"
-    bl_label = "Validate Configuration Consistency"
+    bl_label = "Validate Configuration"
+    endpoints: bpy.props.BoolProperty(default=False)
 
     def execute(self, context):
-        result = validate()
-        publish("Configuration consistency", result)
+        if self.endpoints:
+            result = validate()
+        else:
+            result = {
+                "errors": hierarchy_errors(),
+                "warnings": geometry_warnings(),
+                "unregistered": [obj.name for obj in unregistered()],
+            }
+            for name in CONFIGURATIONS.values():
+                try:
+                    validate_channels(bpy.data.actions[name], require_complete=True)
+                except (ValueError, KeyError) as error:
+                    result["errors"].append({"action": name, "error": str(error)})
+            if not result["errors"]:
+                result.update(comparison())
+        publish("Endpoint validation" if self.endpoints else "Configuration comparison", result)
         self.report(
             {"WARNING"} if result["errors"] else {"INFO"},
             f"{len(result['errors'])} errors, {len(result['warnings'])} warnings; "
@@ -749,46 +1011,289 @@ def create_references():
     return root
 
 
-def register_articulated_objects():
-    """Explicitly adopt new objects without renaming or replacing artist animation."""
-    data = manifest()
-    count = 0
-    missing = set(data["rest"]) - set(bpy.data.objects.keys())
-    for node in missing:
-        data["rest"].pop(node)
-    data["editable"] = [n for n in data["editable"] if n not in missing]
-    for action in bpy.data.actions:
-        for slot in list(action.slots):
-            if slot.identifier.removeprefix("OB") in missing:
-                action.slots.remove(slot)
-    for obj in bpy.context.scene.objects:
-        if obj in reference_objects() or obj.name in data["rest"]:
+def write_manifest(data):
+    text = bpy.data.texts["TC167_AUTHORING_MANIFEST.json"]
+    text.clear()
+    text.write(json.dumps(data))
+    _decode_manifest.cache_clear()
+
+
+def capture_structure(obj):
+    return {
+        "parent": obj.parent.name if obj.parent else None,
+        "parent_inverse": [list(row) for row in obj.matrix_parent_inverse],
+        "type": obj.type,
+        "identity": uuid.uuid4().hex,
+    }
+
+
+def install_identity_baseline():
+    """Record identity only. Preserve all Actions, pivots, and mesh datablocks."""
+    data = json.loads(json.dumps(manifest()))
+    for node in data["rest"]:
+        obj = bpy.context.scene.objects.get(node)
+        if obj is not None and "identity" not in data["structure"][node]:
+            identity = uuid.uuid4().hex
+            data["structure"][node]["identity"] = identity
+            obj["tc167_identity"] = identity
+    root = bpy.context.scene.objects.get("TC167Root")
+    baseline = data["structure"].get("TC167Root")
+    if (
+        root
+        and root.parent
+        and root.parent.name == "TC_ROOT"
+        and baseline
+        and baseline["parent"] is None
+        and baseline["parent_inverse"] == [list(row) for row in root.matrix_parent_inverse]
+    ):
+        # M21.4 introduced TC_ROOT after the legacy manifest had been generated.
+        baseline["parent"] = "TC_ROOT"
+    data["version"] = 2
+    write_manifest(data)
+
+
+def unregistered():
+    known = manifest()["rest"]
+    references = set(reference_objects())
+    return [
+        obj
+        for obj in bpy.context.scene.objects
+        if obj.name not in known
+        and obj not in references
+        and obj.type in {"MESH", "EMPTY"}
+        and not (obj.type == "EMPTY" and obj.empty_display_type == "IMAGE")
+    ]
+
+
+def hierarchy_errors():
+    objects = bpy.context.scene.objects
+    errors = []
+    for node in manifest()["rest"]:
+        baseline = manifest()["structure"][node]
+        obj = objects.get(node)
+        identity = baseline.get("identity")
+        if not obj or (identity and obj.get("tc167_identity") != identity):
+            matches = [o.name for o in objects if identity and o.get("tc167_identity") == identity]
+            errors.append(
+                {
+                    "node": node,
+                    "error": "Missing or renamed registered object",
+                    "identity_matches": matches,
+                }
+            )
             continue
+        parent = obj.parent.name if obj.parent else None
+        if (
+            parent != baseline["parent"]
+            or [list(row) for row in obj.matrix_parent_inverse] != baseline["parent_inverse"]
+        ):
+            errors.append(
+                {
+                    "node": node,
+                    "error": "Hierarchy or pivot changed",
+                    "saved_parent": baseline["parent"],
+                    "current_parent": parent,
+                }
+            )
+        if (
+            obj.constraints
+            or (obj.animation_data and obj.animation_data.drivers)
+            or obj.parent_type != "OBJECT"
+            or any(obj.delta_location)
+            or any(obj.delta_rotation_euler)
+            or any(obj.delta_rotation_quaternion[1:])
+            or tuple(obj.delta_scale) != (1, 1, 1)
+        ):
+            errors.append(
+                {"node": node, "error": "Unsupported constraint, driver, parenting or delta TRS"}
+            )
+    return errors
+
+
+def mesh_digest(obj):
+    return hashlib.sha256(
+        repr(
+            (
+                [list(v.co) for v in obj.data.vertices],
+                [list(p.vertices) for p in obj.data.polygons],
+            )
+        ).encode()
+    ).hexdigest()
+
+
+def geometry_warnings():
+    warnings = []
+    for obj in bpy.context.scene.objects:
+        if obj.type != "MESH":
+            continue
+        issues = []
+        if obj.data.users > 1:
+            issues.append("Shared mesh datablock; Edit Mode affects other instances")
+        if obj.data.shape_keys:
+            issues.append("Shape keys present; TC167 rigid GLB export omits morph animation")
+        if obj.modifiers:
+            issues.append("Modifiers may change evaluated geometry; inspect the export")
+        if obj.mode == "EDIT":
+            issues.append("Edit Mode changes mesh geometry in every configuration")
+        expected = manifest()["mesh_hashes"].get(obj.name)
+        if expected and expected != mesh_digest(obj):
+            issues.append("Mesh geometry or origin changed across all configurations")
+        if issues:
+            warnings.append({"node": obj.name, "warnings": issues})
+    return warnings
+
+
+def ensure_export_binding(obj, action, slot):
+    animation = obj.animation_data_create()
+    if not any(
+        strip.action == action and strip.action_slot == slot
+        for track in animation.nla_tracks
+        for strip in track.strips
+    ):
+        track = animation.nla_tracks.new()
+        track.name = action.name + " export binding"
+        track.mute = True
+        strip = track.strips.new(action.name, int(action.frame_start), action)
+        strip.action_slot = slot
+    animation.use_nla = False
+
+
+def register_articulated_objects(objects=None, allow_nonfighter=False):
+    """Initialize parts from the explicitly reviewed current local pose."""
+    if bpy.context.mode != "OBJECT":
+        raise ValueError("Finish separation and return to Object Mode")
+    scene = bpy.context.scene
+    config = current_configuration()
+    if scene.get("tc167_action") != CONFIGURATIONS[config]:
+        raise ValueError("Select a configuration before initializing new parts")
+    if config != "FIGHTER" and not allow_nonfighter:
+        raise ValueError(
+            "Use FIGHTER or explicitly confirm copying the current pose to all configurations"
+        )
+    errors = hierarchy_errors()
+    if errors:
+        raise ValueError(str(errors[0]))
+    candidates = set(unregistered())
+    parts = sorted(
+        candidates if objects is None else candidates.intersection(objects),
+        key=lambda obj: obj.name,
+    )
+    data = json.loads(json.dumps(manifest()))
+    actions = [bpy.data.actions[name] for name in (*CONFIGURATIONS.values(), *RELATIONSHIPS)]
+    planned = []
+    for obj in parts:
+        if (
+            obj.parent is None
+            or obj.parent.name not in data["rest"]
+            and obj.parent not in parts
+            and obj.parent.name != "TC_ROOT"
+        ):
+            raise ValueError(
+                f"{obj.name}: parent it to a registered or simultaneously initialized part"
+            )
+        if (
+            obj.constraints
+            or obj.parent_type != "OBJECT"
+            or any(obj.delta_location)
+            or any(obj.delta_rotation_euler)
+            or any(obj.delta_rotation_quaternion[1:])
+            or tuple(obj.delta_scale) != (1, 1, 1)
+            or (obj.animation_data and obj.animation_data.drivers)
+        ):
+            raise ValueError(f"{obj.name}: unsupported constraint, driver, parenting or delta TRS")
+        if len(obj.name.encode()) > 63:
+            raise ValueError(f"{obj.name}: name too long for an Action slot")
         basis = obj.matrix_basis.copy()
+        location, rotation, scale = basis.decompose()
+        pose = dict(zip(PATHS, (location, rotation, scale)))
+        if (
+            not all(math.isfinite(v) for row in basis for v in row)
+            or max(
+                abs(x - y) for ar, br in zip(basis, basis_from_pose(pose)) for x, y in zip(ar, br)
+            )
+            > TOLERANCE
+        ):
+            raise ValueError(f"{obj.name}: unsupported local transform")
+        for action in actions:
+            validate_channels(action, nodes=[obj.name])
+        data["rest"][obj.name] = [list(row) for row in basis]
+        data["structure"][obj.name] = capture_structure(obj)
+        data["editable"].append(obj.name)
+        if obj.type == "MESH":
+            data["mesh_hashes"][obj.name] = mesh_digest(obj)
+        planned.append((obj, basis, pose))
+    if not planned:
+        return []
+    write_manifest(data)
+    source_names = {
+        entry["identity"]: node for node, entry in data["structure"].items() if "identity" in entry
+    }
+    report = []
+    for obj, basis, pose in planned:
+        source = source_names.get(obj.get("tc167_identity"))
+        obj["tc167_identity"] = data["structure"][obj.name]["identity"]
         obj.rotation_mode = "QUATERNION"
         obj.matrix_basis = basis
-        data["rest"][obj.name] = [list(r) for r in basis]
-        data["editable"].append(obj.name)
-        count += 1
-    bpy.data.texts["TC167_AUTHORING_MANIFEST.json"].clear()
-    bpy.data.texts["TC167_AUTHORING_MANIFEST.json"].write(json.dumps(data))
-    _decode_manifest.cache_clear()
-    # Add only missing endpoint channels; keep all existing interior keys and handles.
-    for name in (*CONFIGURATIONS.values(), *RELATIONSHIPS):
-        action = bpy.data.actions[name]
-        for node in manifest()["editable"]:
+        animation = obj.animation_data_create()
+        previous_action, previous_slot = animation.action, animation.action_slot
+        if (
+            previous_action
+            and previous_action not in actions
+            and previous_slot
+            and previous_slot.identifier != "OB" + (source or "")
+        ):
+            previous_action.use_fake_user = True
+        animation.action = None
+        # Separate can inherit the source object's NLA bindings. Remove those
+        # bindings from this new object so export discovers only its own slots.
+        removed_bindings = []
+        for track in list(animation.nla_tracks):
+            locked = track.lock
+            for strip in list(track.strips):
+                inherited = (
+                    source and strip.action_slot and strip.action_slot.identifier == "OB" + source
+                )
+                wrong_slot = strip.action in actions and strip.action_slot != slot_for(
+                    strip.action, obj.name
+                )
+                if inherited or wrong_slot:
+                    removed_bindings.append(strip.action.name)
+                    track.lock = False
+                    track.strips.remove(strip)
+            if track.strips:
+                track.lock = locked
+            else:
+                animation.nla_tracks.remove(track)
+        initialized = {}
+        for action in actions:
+            present = channels(action, obj.name)
+            created = []
             for path, width in PATHS.items():
-                present = channels(action, node)
                 for i in range(width):
                     if (path, i) in present:
                         continue
-                    frames = (action.frame_start, action.frame_end)
-                    fallback = [values(action, node, path, frame)[i] for frame in frames]
-                    curve = ensure_curve(action, node, path, i)
-                    for frame, value in zip(frames, fallback):
-                        write_key(curve, frame, value)
-                    curve.update()
-    return count
+                    curve = ensure_curve(action, obj.name, path, i)
+                    for frame in sorted({action.frame_start, action.frame_end}):
+                        write_key(curve, frame, pose[path][i])
+                    created.append(f"{path}[{i}]")
+            ensure_export_binding(obj, action, slot_for(action, obj.name))
+            initialized[action.name] = created
+        report.append(
+            {
+                "node": obj.name,
+                "parent": obj.parent.name,
+                "source": config,
+                "initialized_channels": initialized,
+                "removed_inherited_bindings": removed_bindings,
+            }
+        )
+    # Preserve pending transforms on already-registered objects.
+    action = bpy.data.actions[CONFIGURATIONS[config]]
+    if scene.get("tc167_editing"):
+        for obj, _, _ in planned:
+            obj.animation_data.action = action
+            obj.animation_data.action_slot = slot_for(action, obj.name)
+    return report
 
 
 def validate_anchors():
@@ -812,28 +1317,12 @@ def validate_anchors():
 
 def validate():
     """Validate export contracts; geometry and decorative nodes may evolve freely."""
-    errors = validate_anchors()
-    for obj in bpy.context.scene.objects:
-        if (
-            obj.type == "ARMATURE"
-            or obj.constraints
-            or (obj.animation_data and obj.animation_data.drivers)
-        ):
-            errors.append(
-                {"node": obj.name, "error": "Bake constraints/drivers to rigid object TRS"}
-            )
-        if (
-            obj.name not in manifest()["rest"]
-            and obj not in reference_objects()
-            and obj.animation_data
-            and obj.animation_data.action
-        ):
-            errors.append(
-                {
-                    "node": obj.name,
-                    "error": "Register new articulated objects before saving configurations",
-                }
-            )
+    errors = validate_anchors() + hierarchy_errors()
+    errors.extend(
+        {"node": obj.name, "error": "Unregistered articulated object"} for obj in unregistered()
+    )
+    if bpy.context.mode != "OBJECT":
+        errors.append({"error": "Return to Object Mode before validating for export"})
     for name in (*CONFIGURATIONS.values(), *RELATIONSHIPS, "BD_Idle", "BD_Walk", "BD_Run"):
         action = bpy.data.actions.get(name)
         if not action or not action.slots:
@@ -853,16 +1342,22 @@ def validate():
                 if any(not math.isfinite(v) for k in curve.keyframe_points for v in k.co):
                     errors.append({"action": name, "node": node, "error": "Non-finite key"})
     for config in CONFIGURATIONS:
-        for change in preview(config):
-            errors.append(
-                {"configuration": config, "error": "Unsynchronized endpoint", "change": change}
-            )
+        try:
+            for change in preview(config):
+                errors.append(
+                    {
+                        "configuration": config,
+                        "error": "Unsynchronized endpoint",
+                        "channel": change["channel"],
+                        "change": change,
+                    }
+                )
+        except (ValueError, KeyError) as error:
+            errors.append({"configuration": config, "error": str(error)})
     return {
         "errors": errors,
-        "warnings": [
-            "Review TC_BODY collision envelope and contacts after geometry edits; "
-            "references do not validate arbitrary visual collision geometry."
-        ],
+        "warnings": geometry_warnings()
+        + ["Review TC_BODY collision envelope and contacts after geometry edits."],
     }
 
 
@@ -876,8 +1371,6 @@ class TC167_OT_references(bpy.types.Operator):
         op = self.operation
         if op == "CREATE":
             create_references()
-        elif op == "REGISTER":
-            register_articulated_objects()
         elif op in ("VALIDATE", "GAME"):
             report = validate() if op == "GAME" else {"errors": validate_anchors()}
             publish("Validate for Game" if op == "GAME" else "Validate Anchors", report)
@@ -905,6 +1398,160 @@ class TC167_OT_references(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class TC167_OT_parts(bpy.types.Operator):
+    bl_idname = "tc167.parts"
+    bl_label = "Articulated Objects"
+    bl_options = {"REGISTER", "UNDO"}
+    operation: bpy.props.StringProperty()
+    copy_current: bpy.props.BoolProperty(
+        name="Use this layout as the initial pose in all three configurations", default=False
+    )
+
+    def invoke(self, context, event):
+        if self.operation in {"SELECTED", "INITIALIZE"}:
+            self.copy_current = False
+            return context.window_manager.invoke_props_dialog(self, width=580)
+        return self.execute(context)
+
+    def draw(self, context):
+        self.layout.label(
+            text=f"Initial local transforms come from the current {current_configuration()} layout."
+        )
+        self.layout.label(text="For a straight fuselage, select FIGHTER and align the parts first.")
+        self.layout.prop(self, "copy_current")
+
+    def execute(self, context):
+        candidates = unregistered()
+        if self.operation in {"SELECTED", "INITIALIZE"}:
+            if not self.copy_current:
+                self.report({"WARNING"}, "Confirm the initial layout before writing keys")
+                return {"CANCELLED"}
+            try:
+                result = register_articulated_objects(
+                    context.selected_objects if self.operation == "SELECTED" else None,
+                    allow_nonfighter=True,
+                )
+            except (ValueError, KeyError) as error:
+                self.report({"ERROR"}, str(error))
+                return {"CANCELLED"}
+        elif self.operation == "HIERARCHY":
+            result = hierarchy_errors()
+        else:
+            result = [
+                {"node": obj.name, "parent": obj.parent.name if obj.parent else None}
+                for obj in candidates
+            ]
+            if self.operation == "SHOW" and context.mode == "OBJECT":
+                bpy.ops.object.select_all(action="DESELECT")
+                for obj in candidates:
+                    if obj.name in context.view_layer.objects:
+                        obj.hide_set(False)
+                        obj.select_set(True)
+        publish("Articulated objects " + self.operation, result)
+        self.report({"INFO"}, f"{len(result)} entries in TC167_Last_Report.json")
+        return {"FINISHED"}
+
+
+def export_scene_glb(filepath):
+    """Export the neutral rigid-object hierarchy and all authored clips."""
+    scene = bpy.context.scene
+    state = {
+        obj.name: (
+            obj.matrix_basis.copy(),
+            obj.hide_get(),
+            obj.select_get(),
+            obj.animation_data.action if obj.animation_data else None,
+            obj.animation_data.action_slot if obj.animation_data else None,
+            obj.animation_data.use_nla if obj.animation_data else False,
+        )
+        for obj in bpy.context.view_layer.objects
+    }
+    active = bpy.context.view_layer.objects.active
+    frame, subframe = scene.frame_current, scene.frame_subframe
+    editing = scene.get("tc167_editing")
+    scene["tc167_editing"] = "EXPORT"
+    try:
+        for obj in bpy.context.view_layer.objects:
+            if obj.animation_data:
+                obj.animation_data.action = None
+                obj.animation_data.use_nla = False
+            basis = manifest()["rest"].get(obj.name)
+            if basis is not None:
+                obj.matrix_basis = Matrix(basis)
+            obj.hide_set(False)
+        scene.frame_set(0)
+        bpy.context.view_layer.update()
+        bpy.ops.object.select_all(action="SELECT")
+        return bpy.ops.export_scene.gltf(
+            filepath=str(filepath),
+            export_format="GLB",
+            use_selection=True,
+            export_animations=True,
+            export_animation_mode="ACTIONS",
+            export_merge_animation="ACTION",
+            export_force_sampling=True,
+            export_frame_step=1,
+            export_frame_range=False,
+            export_anim_slide_to_zero=True,
+            export_current_frame=False,
+            export_optimize_animation_keep_anim_object=True,
+            export_skins=False,
+            export_morph=False,
+            export_cameras=False,
+            export_lights=False,
+            export_hierarchy_flatten_objs=False,
+            export_yup=True,
+            export_materials="EXPORT",
+        )
+    finally:
+        for name, (_, hidden, selected, action, slot, nla) in state.items():
+            obj = bpy.context.view_layer.objects[name]
+            if obj.animation_data:
+                obj.animation_data.action = action
+                if slot:
+                    obj.animation_data.action_slot = slot
+                obj.animation_data.use_nla = nla
+            obj.hide_set(hidden)
+            obj.select_set(selected)
+        bpy.context.view_layer.objects.active = active
+        scene.frame_set(frame, subframe=subframe)
+        for name, (basis, *_) in state.items():
+            bpy.context.view_layer.objects[name].matrix_basis = basis
+        if editing is None:
+            del scene["tc167_editing"]
+        else:
+            scene["tc167_editing"] = editing
+        bpy.context.view_layer.update()
+
+
+class TC167_OT_export(bpy.types.Operator):
+    bl_idname = "tc167.export_glb"
+    bl_label = "Export GLB"
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    filter_glob: bpy.props.StringProperty(default="*.glb", options={"HIDDEN"})
+    check_existing: bpy.props.BoolProperty(default=True, options={"HIDDEN"})
+
+    def invoke(self, context, event):
+        self.filepath = bpy.path.abspath("//tc167_authoring.glb")
+        context.window_manager.fileselect_add(self)
+        return {"RUNNING_MODAL"}
+
+    def execute(self, context):
+        result = validate()
+        if result["errors"] or pending_transforms():
+            publish("Export validation", result)
+            self.report(
+                {"ERROR"},
+                "Resolve validation errors and save or discard pending transforms before export",
+            )
+            return {"CANCELLED"}
+        try:
+            return export_scene_glb(bpy.path.ensure_ext(self.filepath, ".glb"))
+        except (RuntimeError, ValueError) as error:
+            self.report({"ERROR"}, str(error))
+            return {"CANCELLED"}
+
+
 class TC167_PT_actions(bpy.types.Panel):
     bl_label = "TC167 Authoring"
     bl_idname = "TC167_PT_actions"
@@ -914,39 +1561,98 @@ class TC167_PT_actions(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text="Configurations: " + current_configuration())
-        for config, name in CONFIGURATIONS.items():
-            layout.operator("tc167.clip", text=config).action_name = name
-        layout.operator("tc167.save_configuration")
-        layout.operator("tc167.validate_configuration", text="Validate Configuration")
-        layout.label(text="Transformations")
-        for name, ends in RELATIONSHIPS.items():
-            layout.operator("tc167.clip", text=" → ".join(ends)).action_name = name
-        layout.label(text="Configuration Synchronization")
-        layout.operator("tc167.preview_endpoints")
-        layout.operator("tc167.sync_endpoints")
-        layout.operator("tc167.validate_configuration", text="Validate Endpoint Consistency")
-        layout.label(text="BATTLEDROID locomotion")
-        for name in ("BD_Idle", "BD_Walk", "BD_Run"):
-            layout.operator("tc167.clip", text=name).action_name = name
-        layout.label(text="Physical Reference Anchors")
-        for text, op in (
-            ("Create Missing References", "CREATE"),
-            ("Display / Hide Reference Anchors", "DISPLAY"),
-            ("Select Ground Reference", "GROUND"),
-            ("Select Landing Contacts", "CONTACT"),
-            ("Select Thrust Anchors", "THRUST"),
-            ("Validate Anchors", "VALIDATE"),
-            ("Register New Articulated Objects", "REGISTER"),
-            ("Validate for Game", "GAME"),
+        scene = context.scene
+        config = current_configuration()
+        action_name = scene.get("tc167_action", "")
+        editing = scene.get("tc167_editing", False)
+        layout.label(text=f"Configuration · {config}")
+        layout.label(
+            text=("Editing · " if editing else "Viewing · ") + (action_name or "Choose an Action")
+        )
+        obj = context.active_object
+        assigned = obj.animation_data.action if obj and obj.animation_data else None
+        layout.label(text="Active object Action · " + (assigned.name if assigned else "None"))
+        if editing and any(
+            not check_assignment(bpy.data.actions[action_name], node)
+            for node in manifest()["editable"]
+            if action_name in bpy.data.actions and slot_for(bpy.data.actions[action_name], node)
         ):
-            layout.operator("tc167.references", text=text).operation = op
-        layout.label(text="Playback")
-        layout.operator("screen.animation_play", text="Play / Pause")
-        layout.operator("screen.frame_jump", text="First Frame").end = False
-        layout.operator("tc167.clip", text="Reset to Configuration").action_name = CONFIGURATIONS[
-            current_configuration()
+            layout.label(text="Action or slot changed outside TC167", icon="ERROR")
+        if action_name and scene.tool_settings.use_keyframe_insert_auto:
+            layout.label(text="Auto Key is on", icon="ERROR")
+        if editing and scene.get("tc167_dirty"):
+            layout.label(text="Unsaved Object Mode transforms", icon="ERROR")
+        if action_name:
+            action = layout.operator(
+                "tc167.clip",
+                text=(
+                    "Return to Preview"
+                    if editing
+                    else "Edit Pose"
+                    if action_name in CONFIGURATIONS.values()
+                    else "Edit Animation"
+                ),
+            )
+            action.action_name, action.editing = action_name, not editing
+
+        box = layout.box()
+        box.label(text="Configurations")
+        row = box.row(align=True)
+        for label, name in CONFIGURATIONS.items():
+            row.operator("tc167.clip", text=label, depress=config == label).action_name = name
+        save = box.row()
+        save.enabled = editing and action_name == CONFIGURATIONS[config]
+        save.operator("tc167.save_configuration")
+        box.operator("tc167.validate_configuration")
+
+        box = layout.box()
+        box.label(text="Articulated Objects")
+        if count := len(unregistered()):
+            box.label(text=f"{count} unregistered parts · pose preview incomplete", icon="ERROR")
+        for label, op in (
+            ("Detect New Objects", "DETECT"),
+            ("Register Selected Objects", "SELECTED"),
+            ("Initialize New Parts Across Configurations", "INITIALIZE"),
+            ("Show Unregistered Objects", "SHOW"),
+            ("Validate Parent Hierarchy", "HIERARCHY"),
+        ):
+            box.operator("tc167.parts", text=label).operation = op
+        if context.mode == "EDIT_MESH":
+            box.label(text="Geometry edits affect all configurations.", icon="INFO")
+
+        box = layout.box()
+        box.label(text="Transformations")
+        for name, ends in RELATIONSHIPS.items():
+            box.operator("tc167.clip", text=" → ".join(ends)).action_name = name
+        for name in ("BD_Idle", "BD_Walk", "BD_Run"):
+            box.operator("tc167.clip", text=name).action_name = name
+
+        box = layout.box()
+        box.label(text="Synchronization")
+        box.operator("tc167.preview_endpoints")
+        box.operator("tc167.sync_endpoints")
+        box.operator("tc167.validate_configuration", text="Validate All Endpoints").endpoints = True
+
+        box = layout.box()
+        box.label(text="Physical References")
+        for label, op in (
+            ("Show / Hide Anchors", "DISPLAY"),
+            ("Select Ground References", "GROUND"),
+            ("Select Contact Points", "CONTACT"),
+            ("Select Thrust Anchors", "THRUST"),
+            ("Create Missing References", "CREATE"),
+            ("Validate Anchors", "VALIDATE"),
+        ):
+            box.operator("tc167.references", text=label).operation = op
+
+        box = layout.box()
+        box.label(text="Playback and Export")
+        box.operator("screen.animation_play", text="Play / Pause")
+        box.operator("tc167.clip", text="Reset to Configuration").action_name = CONFIGURATIONS[
+            config
         ]
+        box.operator("tc167.references", text="Validate for Game").operation = "GAME"
+        box.operator("tc167.export_glb")
 
 
 for cls in (
@@ -956,9 +1662,35 @@ for cls in (
     TC167_OT_sync,
     TC167_OT_validate,
     TC167_OT_references,
+    TC167_OT_parts,
+    TC167_OT_export,
     TC167_PT_actions,
 ):
     old = getattr(bpy.types, cls.__name__, None)
     if old:
         bpy.utils.unregister_class(old)
     bpy.utils.register_class(cls)
+
+
+def track_dirty(scene, depsgraph):
+    if (
+        bpy.context.mode != "OBJECT"
+        or not scene.get("tc167_editing")
+        or scene.get("tc167_editing") == "EXPORT"
+    ):
+        return
+    if not any(update.is_updated_transform for update in depsgraph.updates):
+        return
+    dirty = bool(pending_transforms(update=False))
+    if bool(scene.get("tc167_dirty")) != dirty:
+        scene["tc167_dirty"] = dirty
+
+
+for handlers, callback in (
+    (bpy.app.handlers.frame_change_post, display_preview),
+    (bpy.app.handlers.depsgraph_update_post, track_dirty),
+):
+    for old in list(handlers):
+        if old.__name__ == callback.__name__:
+            handlers.remove(old)
+    handlers.append(callback)
