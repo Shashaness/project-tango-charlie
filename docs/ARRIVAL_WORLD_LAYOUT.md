@@ -45,3 +45,7 @@ The crash is off the paved road. The proposed recovery leg uses the yard, passes
 Run `python -m tools.map_arrival` from the repository root. The utility resolves GLB footprints from the same authored placements used by gameplay and samples the same spline as the runtime road. Labels and the proposed recovery leg are editorial annotations.
 
 Use `python main.py --campaign --campaign-save saves/arrival-q12c.json` for a new Q1.2C playthrough without replacing an older campaign. The save carries a layout identifier. Q1.2A and Q1.2B saves continue on their original manifest and object positions, and older legacy campaigns retain their existing compatibility.
+
+## Q1.3A service and recovery equipment
+
+Hangar C is provisionally placed at **(300, 0, 4610) m** with manifest yaw 0° and navigation heading **180°**. Its open west face connects to the existing apron along its northern frontage without moving either neighboring hangar. The station and rack are near (306, 0, 4600). The control tower placeholder stands at (190, 0, 4270), and ATAT-773 and the CRN-329 proxy are in Hangar B. The overhead map shows those locations. The original recovery route remains a planning overlay.

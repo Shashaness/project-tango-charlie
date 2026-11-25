@@ -1,0 +1,9 @@
+# Physical cargo architecture
+
+Small credentials are personal inventory entries. Industrial batteries remain physical objects with stable IDs. Each item occupies one slot state at a time. Rack and installed positions are fixed attachment sites. World cargo has a grounded position. Held cargo uses the pilot's forward transform. Loaded cargo uses the full Jeep transform and a configured local offset.
+
+The handling profile permits one carried battery, halves on-foot speed, and limits each lift to five meters. Kara can set down the battery sooner using the contextual action. At the limit she sets it down in reachable clear ground. Board with hands free. Load or unload from behind a stationary Jeep. Check the cargo interface, available capacity, and any held or loaded object before transferring. The delivery objective measures travel with the battery attached to the occupied Jeep and requires at least 20 m before arrival near ATAT-773.
+
+The current Jeep uses a provisional external carrier. The industrial battery measures 1.2192 × 0.6096 × 0.6096 m. The carrier centers it at local (0, 0.43, −3.73) m with a 1.32 m wide platform. Its front edge clears the current visual's rear extent at −3.331 m. The placement keeps the battery behind the spare tire and away from the cabin and seat. Position the extended rear carrier away from obstacles. The Jeep's existing driving and collision envelope still applies, and cargo mass and swept carrier collision are deferred.
+
+Expanded campaign saves use schema 4 and retain the layout ID. Schema 3 resumes with its original objects, quest progress and actor transforms plus authored recovery defaults at that layout's airport. New cargo state, condition, charge, and inventory persist; restore rejects duplicate occupants of exclusive slots. Schema 1 and 2 keep their original campaign path.

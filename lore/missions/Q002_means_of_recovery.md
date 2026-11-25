@@ -6,4 +6,4 @@ Kara needs access to the heavy recovery facility before she can assess equipment
 
 She locates the [heavy recovery hangar](../locations/heavy_recovery_hangar.md), unlocks the personnel door and enters on foot. She finds the gate control, opens the gate, drives the Jeep inside, and discovers and inspects the crane and trolley. Valid actions taken early remain recorded.
 
-Equipment restoration and towing await future content. The mission stays active, and the signal remains unresolved. See the [journal templates](../journals/kara_voss/mission_entries.md) and [quest definitions](../../assets/quests/arrival.json).
+Q1.3A makes battery recovery and electrical restoration playable. Crane authorization and operation, towing, stabilization, and aircraft securing remain future checkpoints. The mission stays active, and the signal remains unresolved. See the [journal templates](../journals/kara_voss/mission_entries.md) and [quest definitions](../../assets/quests/arrival.json).

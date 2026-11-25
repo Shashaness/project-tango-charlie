@@ -90,7 +90,7 @@
     {
       "id": "Q002",
       "title": "The Means of Recovery",
-      "description": "Find access to the heavy recovery facility and inspect its equipment.",
+      "description": "Access the heavy recovery facility and restore electrical power to ATAT-773.",
       "owner": "pilot_01",
       "classification": "main",
       "prerequisites": [
@@ -127,14 +127,14 @@
         },
         {
           "id": "key_seen",
-          "title": "Discover the key",
+          "title": "Discover the maintenance access card",
           "type": "discover",
           "target": "office_key",
           "stage": 4
         },
         {
           "id": "key_taken",
-          "title": "Collect the key",
+          "title": "Collect the maintenance access card",
           "type": "collect",
           "target": "office_key",
           "stage": 5
@@ -210,11 +210,88 @@
           "stage": 15
         },
         {
-          "id": "restore",
-          "title": "Trolley restoration and towing await future content",
-          "type": "repair",
+          "id": "battery_fault",
+          "title": "Identify the depleted battery",
+          "type": "inspect",
           "target": "trolley",
           "stage": 16
+        },
+        {
+          "id": "visit_c",
+          "title": "Explore Hangar C",
+          "type": "reach",
+          "target": "hangar_c",
+          "stage": 17
+        },
+        {
+          "id": "station_found",
+          "title": "Discover the battery service station",
+          "type": "discover",
+          "target": "battery_station",
+          "stage": 18
+        },
+        {
+          "id": "batteries_exam",
+          "title": "Inspect the industrial batteries",
+          "type": "inspect",
+          "target": "battery_station",
+          "stage": 19
+        },
+        {
+          "id": "battery_eligible",
+          "title": "Identify a compatible charged battery",
+          "type": "inspect",
+          "target": "battery_station",
+          "stage": 20
+        },
+        {
+          "id": "jeep_service",
+          "title": "Bring the Jeep to the service area",
+          "type": "reach",
+          "target": "hangar_c",
+          "stage": 21
+        },
+        {
+          "id": "battery_loaded",
+          "title": "Load a replacement battery into the Jeep",
+          "type": "load",
+          "target": "hangar-jeep",
+          "stage": 22
+        },
+        {
+          "id": "battery_delivered",
+          "title": "Transport the replacement to ATAT-773",
+          "type": "deliver",
+          "target": "trolley",
+          "stage": 23
+        },
+        {
+          "id": "battery_removed",
+          "title": "Remove the depleted battery",
+          "type": "interact",
+          "target": "trolley_battery_bay",
+          "stage": 24
+        },
+        {
+          "id": "battery_installed",
+          "title": "Install the replacement battery",
+          "type": "install",
+          "target": "trolley",
+          "stage": 25
+        },
+        {
+          "id": "trolley_online",
+          "title": "Verify ATAT-773 electrical operation",
+          "type": "inspect",
+          "target": "trolley",
+          "stage": 26
+        },
+        {
+          "id": "restore",
+          "title": "Crane authorization and recovery preparation await future content",
+          "type": "repair",
+          "target": "trolley",
+          "stage": 27
         }
       ],
       "journal": {

@@ -1,5 +1,6 @@
 """Q1.2A campaign integration and explicit legacy layout compatibility."""
 
+import json
 from pathlib import Path
 from textwrap import wrap
 
@@ -7,10 +8,11 @@ import numpy as np
 
 from engine.asset_paths import asset_path
 from game.campaign import DEFAULT_SAVE, JEEP, JEEP_PROFILE, OPENING, ArrivalCampaign
-from game.interactive import InteractiveScene, actor_bounds
+from game.equipment import RecoveryScene, Slot
+from game.interactive import actor_bounds
 from game.quests.manager import Event, Status
 from game.quests.persistence import read_save
-from game.world_manifest import require
+from game.world_manifest import object_fields, require
 
 WORLD = asset_path("worlds/arrival/world.json")
 QUESTS = asset_path("quests/arrival.json")
@@ -18,6 +20,10 @@ OBJECTS = asset_path("worlds/arrival/objects.json")
 Q12B_WORLD = asset_path("worlds/arrival/world_q12b.json")
 PREVIOUS_WORLD = asset_path("worlds/arrival/world_q12a.json")
 PREVIOUS_OBJECTS = asset_path("worlds/arrival/objects_q12a.json")
+RECOVERY = asset_path("worlds/arrival/recovery.json")
+RECOVERY_JOURNAL = json.loads(
+    asset_path("worlds/arrival/recovery_journal.json").read_text(encoding="utf-8")
+)
 JOURNEY = (
     "The Jeep works. I still can't quite believe it. As I drive toward the airport, the city is "
     "becoming clearer. The buildings are enormous. I've seen cities like this in the archives, "
@@ -51,7 +57,7 @@ def open_campaign(path=DEFAULT_SAVE, *, new=False):
         raw = read_save(path)
         if isinstance(raw, dict) and raw.get("schema_version") in (1, 2):
             return ArrivalCampaign(path)
-        if isinstance(raw, dict) and raw.get("schema_version") == 3 and "layout" not in raw:
+        if isinstance(raw, dict) and raw.get("schema_version") in (3, 4) and "layout" not in raw:
             return ExpandedArrival(path, previous_layout=True)
         if isinstance(raw, dict) and raw.get("layout") == "q12b":
             return ExpandedArrival(path, layout_revision="q12b")
@@ -65,7 +71,7 @@ class ExpandedArrival(ArrivalCampaign):
         self.previous_layout = previous_layout
         self.layout_revision = "q12a" if previous_layout else layout_revision
         world = {"q12a": PREVIOUS_WORLD, "q12b": Q12B_WORLD, "q12c": WORLD}[self.layout_revision]
-        self.objects = InteractiveScene(PREVIOUS_OBJECTS if previous_layout else OBJECTS)
+        self.objects = RecoveryScene(PREVIOUS_OBJECTS if previous_layout else OBJECTS, RECOVERY)
         self.selection = None
         self.selection_position = (0, 0)
         self._selected_id = None
@@ -88,16 +94,22 @@ class ExpandedArrival(ArrivalCampaign):
             "q1_complete",
             "locked_attempt",
             "key_with_context",
+            "crane_card_taken",
+            "crane_card_seen",
+            "crane_authorization_exam",
+            "battery_a_exam",
+            "battery_b_exam",
         }
 
     def _validate(self, raw):
         require(
             isinstance(raw, dict)
             and type(raw.get("schema_version")) is int
-            and raw["schema_version"] == 3,
+            and raw["schema_version"] in (3, 4),
             "Unsupported expanded Arrival save",
         )
         require("objects" in raw, "Expanded save requires object state")
+        version = raw["schema_version"]
         raw = raw.copy()
         objects = raw.pop("objects")
         require(
@@ -105,6 +117,20 @@ class ExpandedArrival(ArrivalCampaign):
             "Save belongs to a different Arrival layout",
         )
         raw["schema_version"] = 2
+        if version == 3:
+            # Preserve the old layout and actor data. Add default states for newly authored IDs.
+            object_fields(objects, "schema 3 interactive objects", self.objects.legacy_object_ids)
+            additions = self.objects.snapshot()
+            additions.update(objects)
+            objects = additions
+            saved = raw["quests"]["progress"]["Q002"]
+            saved.update({key: 0 for key in self.manager.progress["Q002"] if key not in saved})
+        else:
+            self.objects.restore_cargo(raw.pop("cargo"))
+            require(
+                raw["occupied"] is None or self.objects.occupying(Slot.CARRIED) is None,
+                "A seated pilot cannot carry cargo",
+            )
         validated = super()._validate(raw)
         self.objects.restore(objects, self.owner)
         require(
@@ -114,6 +140,11 @@ class ExpandedArrival(ArrivalCampaign):
         require(
             ("unlock" in self.facts) == (not self.objects.objects["personnel_door"].locked),
             "Inconsistent personnel lock state",
+        )
+        require(
+            ("crane_card_taken" in self.facts)
+            == ("crane_access_card" in self.objects.inventory(self.owner)),
+            "Inconsistent crane card ownership",
         )
         q2 = self.manager.progress["Q002"]
         require(
@@ -126,9 +157,15 @@ class ExpandedArrival(ArrivalCampaign):
         game.player_control.space.interactive_obstacles = self.objects.obstacles
         game.world.live_entities.update(self.objects.objects)
         super().bind(game)
+        control = game.player_control
+        self.objects.bind(control.registry[JEEP].vehicle, control._pilot, self.owner)
 
     def payload(self, game):
-        payload = super().payload(game) | {"schema_version": 3, "objects": self.objects.snapshot()}
+        payload = super().payload(game) | {
+            "schema_version": 4,
+            "objects": self.objects.snapshot(),
+            "cargo": self.objects.cargo_snapshot(),
+        }
         if not self.previous_layout:
             payload["layout"] = self.layout_revision
         return payload
@@ -168,6 +205,34 @@ class ExpandedArrival(ArrivalCampaign):
                 self._observe(fact, event.location)
                 if fact == "key_taken" and "locked_attempt" in self.facts:
                     self._observe("key_with_context", event.location)
+            self._record_recovery(event)
+
+    def _record_recovery(self, event):
+        kind, target, pos = event.type, event.target, event.location
+        if kind == "ENTITY_INSPECTED":
+            if target == "crane_station":
+                self._observe("crane_authorization_exam", pos)
+            if target == "trolley":
+                if self.objects.electrically_operational:
+                    self._observe("trolley_online", pos)
+                elif self.objects.occupying(Slot.INSTALLED) is not None:
+                    self._observe("battery_fault", pos)
+            if target in ("battery_a", "battery_b"):
+                self._observe(f"{target}_exam", pos)
+                if {"battery_a_exam", "battery_b_exam"} <= self.facts.keys():
+                    self._observe("batteries_exam", pos)
+                if self.objects.compatible(target):
+                    self._observe("battery_eligible", pos)
+            if target == "battery_original" and self.objects.batteries[target].charge == 0:
+                self._observe("battery_fault", pos)
+        elif kind == "CARGO_LOADED" and self.objects.compatible(event.data["battery"]):
+            self._observe("battery_loaded", pos)
+        elif kind == "COMPONENT_REMOVED" and event.data["battery"] == "battery_original":
+            self._observe("battery_removed", pos)
+        elif kind == "COMPONENT_INSTALLED":
+            self._observe("battery_installed", pos)
+        elif kind == "ITEM_COLLECTED" and target == "crane_access_card":
+            self._observe("crane_card_taken", pos)
 
     def _explore(self, game, position, occupied):
         def local(identity):
@@ -184,6 +249,16 @@ class ExpandedArrival(ArrivalCampaign):
             self._observe("explore_a", position)
         if not occupied and self._inside(game, "hangar_b", position):
             self._observe("enter_b", position)
+        if self._inside(game, "hangar_c", position):
+            self._observe("visit_c", position)
+            if (
+                occupied
+                and np.linalg.norm(
+                    (position - self.objects.objects["battery_station"].position)[[0, 2]]
+                )
+                <= 18
+            ):
+                self._observe("jeep_service", position)
 
     def _foot(self, game, occupants):
         control = game.player_control
@@ -208,6 +283,10 @@ class ExpandedArrival(ArrivalCampaign):
         for obj in candidates:
             if obj.identity in EQUIPMENT:
                 self._observe(EQUIPMENT[obj.identity], obj.position)
+            if obj.identity == "battery_station":
+                self._observe("station_found", obj.position)
+            if obj.identity == "crane_access_card":
+                self._observe("crane_card_seen", obj.position)
         ids = [o.identity for o in candidates]
         index = ids.index(self._selected_id) if self._selected_id in ids else 0
         if game.input.object_next_pressed and ids:
@@ -259,6 +338,13 @@ class ExpandedArrival(ArrivalCampaign):
             self.notice = hints[self.hint_index]
             self.notice_until = self.time + 7
         occupants = actor_bounds(control, game.world.ground_vehicles)
+        released = self.objects.tick_cargo(
+            control, previous_drive_position if previous_access is current else None
+        )
+        if released:
+            self.inspected_object = None
+            self.notice_detail = "BATTERY SET DOWN. USE THE JEEP FOR LONGER TRANSPORT."
+            self.detail_until = self.time + 5
         self._explore(game, position, current is not None)
         if current is None:
             self._foot(game, occupants)
@@ -299,6 +385,19 @@ class ExpandedArrival(ArrivalCampaign):
             and self._inside(game, "hangar_b", position)
         ):
             self._observe("jeep_inside", position)
+        loaded = self.objects.occupying(Slot.VEHICLE)
+        if (
+            loaded
+            and self.objects.compatible(loaded)
+            and self.objects.cargo[loaded].transport_m >= self.objects.settings["transport_minimum"]
+            and current is not None
+            and (
+                self._inside(game, "hangar_b", position)
+                and np.linalg.norm((position - self.objects.objects["trolley"].position)[[0, 2]])
+                <= 14
+            )
+        ):
+            self._observe("battery_delivered", position)
         if "crane_exam" in self.facts and "trolley_exam" in self.facts:
             self._observe("equipment_found", position)
         if len(self.facts) != old_count:
@@ -307,7 +406,13 @@ class ExpandedArrival(ArrivalCampaign):
             self._observe("q1_complete", position)
         changed = len(self.facts) != old_count or bool(completed)
         actions = command.inspect_pressed and revision != self.objects.revision
-        if changed or actions or current is not previous_access or self.time - self.last_save >= 10:
+        if (
+            changed
+            or actions
+            or released
+            or current is not previous_access
+            or self.time - self.last_save >= 10
+        ):
             self.save(game)
 
     def _journal_entries(self):
@@ -315,6 +420,7 @@ class ExpandedArrival(ArrivalCampaign):
         templates = (
             q1
             | q2
+            | RECOVERY_JOURNAL
             | {
                 "journey": JOURNEY,
                 "q1_complete": q1["complete"],

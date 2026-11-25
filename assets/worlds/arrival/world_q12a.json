@@ -181,6 +181,22 @@
           3130
         ]
       }
+    },
+    {
+      "id": "hangar_c",
+      "asset": "hangar",
+      "transform": {
+        "position": [
+          300,
+          0,
+          3250
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
     }
   ],
   "player": {

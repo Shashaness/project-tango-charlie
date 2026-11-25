@@ -51,11 +51,6 @@ class PedestrianCamera(Camera):
     def look_direction(self):
         return np.array((math.sin(self.orbit_yaw), 0, math.cos(self.orbit_yaw)))
 
-    def movement_direction(self, strafe, advance):
-        forward = self.look_direction()
-        direction = forward * advance + np.cross(forward, UP) * strafe
-        return direction / max(1, np.linalg.norm(direction))
-
     def observe(self, pilot, space, dt):
         horizontal = self.look_direction()
         self.forward = horizontal * math.cos(self.orbit_pitch) + UP * math.sin(self.orbit_pitch)

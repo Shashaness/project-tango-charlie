@@ -1,5 +1,6 @@
 """Generate the Arrival overhead SVG from the runtime manifest and road tessellation."""
 
+import json
 from html import escape
 from pathlib import Path
 from xml.etree import ElementTree
@@ -8,7 +9,7 @@ import numpy as np
 
 from engine.asset_paths import PROJECT_ROOT
 from game.access_road import AccessRoad
-from game.arrival import WORLD
+from game.arrival import OBJECTS, RECOVERY, WORLD
 from game.urban_layout import CITY_CENTER, CITY_SIZE
 from game.world_loader import SceneRegistry, scene_model
 from game.world_manifest import load_manifest
@@ -16,6 +17,7 @@ from game.world_manifest import load_manifest
 STRUCTURES = {
     "hangar_01": "Hangar A",
     "hangar_b": "Hangar B",
+    "hangar_c": "Hangar C",
     "service_garage": "Jeep garage",
     "service_shed": "Equipment shed",
     "service_store": "Storage",
@@ -24,6 +26,7 @@ STRUCTURES = {
 LABELS = {
     "hangar_01": (300, 4360),
     "hangar_b": (300, 4490),
+    "hangar_c": (300, 4630),
     "service_garage": (27, 4720),
     "service_shed": (147, 4811),
     "service_store": (-4, 4775),
@@ -45,7 +48,7 @@ def generate():
         "stroke:#172b32;stroke-width:4;stroke-linejoin:round}.small{font:12px system-ui}</style>",
         '<text x="39" y="54" class="title">Arrival world layout</text>',
         '<text x="40" y="80" class="caption">'
-        "Project Tango Charlie · Q1.2C · World-local meters</text>",
+        "Project Tango Charlie · Q1.3A · World-local meters</text>",
         '<defs><clipPath id="local">'
         '<rect x="38" y="110" width="533" height="864" rx="10"/></clipPath>'
         '<marker id="arrow" markerWidth="9" markerHeight="8" refX="7" refY="4" orient="auto">'
@@ -116,6 +119,20 @@ def generate():
         if key in {"service_garage", "service_store", "service_workshop"}:
             path((tuple(placement.position[::2]), LABELS[key]), "#d0c5a9", 0.9)
         text(*xy(*LABELS[key]), label, "label")
+
+    recovery = (
+        json.loads(OBJECTS.read_text())["objects"] | json.loads(RECOVERY.read_text())["objects"]
+    )
+    for key, label, dx, dy in (
+        ("control_tower_base", "Control tower", -79, -8),
+        ("battery_station", "Battery station", 10, -6),
+        ("trolley", "ATAT-773", 9, -6),
+        ("crn_chassis", "CRN-329", 9, 9),
+    ):
+        px, _, pz = recovery[key]["position"]
+        x, y = xy(px, pz)
+        svg.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3" fill="#f4ca78"/>')
+        text(x + dx, y + dy, label, "label")
 
     path(
         (

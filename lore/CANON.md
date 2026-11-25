@@ -46,3 +46,9 @@ Kara's detailed personality and biography, the prologue, Chapter I, and the firs
 - **Terrestrial Navigation Helmet:** The project owner established the helmet and its listed navigation capabilities as canon. [Equipment reference](technology/terrestrial_navigation_helmet.md)
 
 Later revisions follow the [review process](README.md#review-and-approval).
+
+## Q1.3A approval
+
+[The Price of Infinity](chronicles/the_price_of_infinity.md) establishes the 2243 controlled-fusion and storage breakthrough, the monopolization of energy, expansion and conquest, wartime extraction of Earth's oceans, the coalition victory, and the scattered survivors. Kara's forward operation investigates Earth's habitability and restoration. She prioritizes recovering TC167. The present year remains uncertain within the fourth millennium. [Protonic Age](history/protonic_age.md)
+
+[ATAT-773](technology/atat_773.md), [CRN-329](technology/crn_329.md), [protonic batteries](technology/protonic_batteries.md), and [electronic access cards](technology/access_cards.md) establish the recovery equipment and credential scopes.

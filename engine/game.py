@@ -494,7 +494,13 @@ class Game:
         previous_drive_position = (
             previous_access.vehicle.position.copy() if previous_access is not None else None
         )
-        switched = self.input.interact_pressed and controls.interact()
+        movement_scale = getattr(getattr(self.campaign, "objects", None), "movement_scale", 1.0)
+        switched = False
+        if self.input.interact_pressed:
+            if previous_mode is ControlMode.ON_FOOT and movement_scale < 1:
+                controls.message = "SET DOWN OR LOAD THE BATTERY BEFORE BOARDING"
+            else:
+                switched = controls.interact()
         cameras = {
             ControlMode.AIRCRAFT: self.camera,
             ControlMode.ON_FOOT: self.pedestrian_camera,
@@ -522,12 +528,21 @@ class Game:
         if on_foot or driving:
             self.camera_input.apply(camera)
         if on_foot:
-            direction = camera.movement_direction(self.input.pilot_strafe, self.input.pilot_advance)
-            if not switched:
-                controls.pilot.update(
-                    dt, controls.space, direction, self.input.pilot_run, self.input.pilot_jump
+            pilot = controls.pilot
+            if switched:
+                pilot.movement_direction(0, 0)
+            else:
+                direction = pilot.movement_direction(
+                    self.input.pilot_strafe, self.input.pilot_advance
                 )
-            camera.observe(controls.pilot, controls.space, dt)
+                pilot.update(
+                    dt,
+                    controls.space,
+                    direction * movement_scale,
+                    self.input.pilot_run and movement_scale == 1,
+                    self.input.pilot_jump and movement_scale == 1,
+                )
+            camera.observe(pilot, controls.space, dt)
         elif driving:
             vehicle = controls.active.vehicle
             if not switched:

@@ -126,6 +126,9 @@ class HelmetInformation:
                         heading = "ITEM ACQUIRED"
                     elif message.startswith("DOOR UNLOCKED"):
                         heading = "ACCESS GRANTED"
+                    elif message.startswith("POWER RESTORED:"):
+                        heading = "POWER RESTORED"
+                        message = message.removeprefix("POWER RESTORED: ")
                     if selected and inspected == selected.identity:
                         self.inspections[inspected] = message
                         self._show_inspection(

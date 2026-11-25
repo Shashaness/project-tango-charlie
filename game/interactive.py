@@ -47,11 +47,12 @@ class InteractiveObject:
 
 
 class InteractiveScene:
-    def __init__(self, path):
+    def __init__(self, path, additions=None):
         data = json.loads(path.read_text())
         require(data["schema_version"] == 1, "Unsupported interactive scene version")
         self.objects = {}
-        for identity, spec in data["objects"].items():
+        require(not (data["objects"].keys() & (additions or {}).keys()), "Duplicate object IDs")
+        for identity, spec in (data["objects"] | (additions or {})).items():
             position = vector(spec["position"], identity)
             size = vector(spec["size"], identity)
             color = vector(spec["color"], identity)
@@ -85,13 +86,16 @@ class InteractiveScene:
         container = self.objects.get(obj.spec.get("container"))
         return obj.owner is None and (container is None or container.progress >= 0.8)
 
+    def solid(self, obj):
+        return obj.spec.get("solid", False)
+
     def obstacles(self, lo, hi):
         if self._collision_revision != self.revision:
             self._collision = np.asarray(
                 [
                     self._bounds(obj)
                     for obj in self.objects.values()
-                    if obj.spec.get("solid") and self.visible(obj)
+                    if self.solid(obj) and self.visible(obj)
                 ]
             ).reshape((-1, 2, 3))
             self._collision_revision = self.revision
@@ -117,8 +121,12 @@ class InteractiveScene:
 
     def render_rows(self):
         for obj in self.objects.values():
-            if self.visible(obj) and "visual" not in obj.spec:
+            if self.visible(obj) and "visual" not in obj.spec and not obj.spec.get("marker"):
                 yield (*self._bounds(obj), obj.spec["color"])
+
+    def oriented_boxes(self):
+        """Dynamic visual boxes in local coordinates with their world transform."""
+        return ()
 
     def visual_rows(self):
         for obj in self.objects.values():
@@ -167,6 +175,12 @@ class InteractiveScene:
             return "COLLECT"
         return "ACTIVATE" if "control" in obj.spec else "INSPECT"
 
+    def describe(self, obj):
+        return obj.spec.get("description", obj.spec["name"])
+
+    def unlock_allowed(self, obj, actor):
+        return obj.spec["key"] in self.inventory(actor)
+
     def interact(self, identity, actor, pilot, space, now, occupants, *, action=None):
         """Validate a requested action and return structured events and feedback."""
         obj = self.objects.get(identity)
@@ -179,10 +193,10 @@ class InteractiveScene:
             return (), "ACTION UNAVAILABLE"
         if action == "INSPECT":
             return (Event("ENTITY_INSPECTED", actor, identity, tuple(self._point(obj)), now),), (
-                obj.spec.get("description", obj.spec["name"])
+                self.describe(obj)
             )
         if obj.locked:
-            if obj.spec["key"] not in self.inventory(actor):
+            if not self.unlock_allowed(obj, actor):
                 return (), "DOOR LOCKED - KEY REQUIRED"
             obj.locked = False
             self.revision += 1
@@ -224,7 +238,7 @@ class InteractiveScene:
             if np.all(lower < hi) and np.all(upper > lo):
                 return True
         for other in self.objects.values():
-            if other is not obj and other.spec.get("solid") and self.visible(other):
+            if other is not obj and self.solid(other) and self.visible(other):
                 lower, upper = other.bounds()
                 if np.all(lower < hi) and np.all(upper > lo):
                     return True

@@ -18,3 +18,12 @@
 | **Heavy recovery hangar** | The airport hangar housing a stationary crane and a towable trolley. [Hangar](locations/heavy_recovery_hangar.md) |
 | **Recovery trolley** | Aircraft recovery equipment available somewhere within the airbase. [Initial world state](world/initial_world_state.md) |
 | **Restoration** | The effort to bring Earth back to a condition capable of sustaining life and civilization. Its feasibility remains unresolved. [Earth](locations/earth.md) |
+
+## Recovery equipment
+
+| Term | Meaning |
+| --- | --- |
+| Protonic battery | Energy storage with equipment-specific compatibility. [Batteries](technology/protonic_batteries.md) |
+| ATAT-773 | Towable aircraft recovery platform. [ATAT-773](technology/atat_773.md) |
+| CRN-329 | Self-propelled mobile military recovery crane. [CRN-329](technology/crn_329.md) |
+| Access card | Electronic credential with explicit facility, equipment, or vehicle permissions. [Credentials](technology/access_cards.md) |

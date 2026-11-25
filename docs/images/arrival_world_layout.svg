@@ -2,7 +2,7 @@
 <rect width="1080" height="1110" fill="#101e25"/>
 <style>text{font:14px system-ui;fill:#f0eadb}.title{font:bold 31px system-ui}.caption{fill:#b9c7ca}.label{font:bold 13px system-ui;paint-order:stroke;stroke:#172b32;stroke-width:4;stroke-linejoin:round}.small{font:12px system-ui}</style>
 <text x="39" y="54" class="title">Arrival world layout</text>
-<text x="40" y="80" class="caption">Project Tango Charlie · Q1.2C · World-local meters</text>
+<text x="40" y="80" class="caption">Project Tango Charlie · Q1.3A · World-local meters</text>
 <defs><clipPath id="local"><rect x="38" y="110" width="533" height="864" rx="10"/></clipPath><marker id="arrow" markerWidth="9" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#f4ca78"/></marker></defs>
 <g clip-path="url(#local)">
 <rect x="38" y="110" width="533" height="864" fill="#263b41"/>
@@ -48,6 +48,8 @@
 <text x="398.0" y="420.0" class="label">Hangar A</text>
 <polygon points="353.00,495.00 443.00,495.00 443.00,605.00 353.00,605.00" fill="#a69b76" stroke="#292a24" stroke-width="2"/>
 <text x="398.0" y="550.0" class="label">Hangar B</text>
+<polygon points="353.00,615.00 443.00,615.00 443.00,725.00 353.00,725.00" fill="#a69b76" stroke="#292a24" stroke-width="2"/>
+<text x="398.0" y="690.0" class="label">Hangar C</text>
 <polygon points="168.57,825.41 168.57,802.91 194.97,802.91 194.97,825.41" fill="#a69b76" stroke="#292a24" stroke-width="2"/>
 <polyline points="181.77,814.16 125.00,780.00" fill="none" stroke="#d0c5a9" stroke-width="0.9" stroke-linejoin="round" />
 <text x="125.0" y="780.0" class="label">Jeep garage</text>
@@ -59,6 +61,14 @@
 <polygon points="214.67,800.06 214.67,816.26 194.87,816.26 194.87,800.06" fill="#a69b76" stroke="#292a24" stroke-width="2"/>
 <polyline points="204.77,808.16 226.00,790.00" fill="none" stroke="#d0c5a9" stroke-width="0.9" stroke-linejoin="round" />
 <text x="226.0" y="790.0" class="label">Workshop</text>
+<circle cx="288.0" cy="330.0" r="3" fill="#f4ca78"/>
+<text x="209.0" y="322.0" class="label">Control tower</text>
+<circle cx="404.0" cy="660.0" r="3" fill="#f4ca78"/>
+<text x="414.0" y="654.0" class="label">Battery station</text>
+<circle cx="413.0" cy="530.0" r="3" fill="#f4ca78"/>
+<text x="422.0" y="524.0" class="label">ATAT-773</text>
+<circle cx="420.0" cy="543.0" r="3" fill="#f4ca78"/>
+<text x="429.0" y="552.0" class="label">CRN-329</text>
 <polyline points="369.00,535.00 326.00,535.00 320.00,565.00 319.79,566.58 319.53,568.40 319.21,570.45 318.85,572.70 318.44,575.14 318.01,577.75 317.54,580.52 317.06,583.43 316.56,586.45 316.06,589.58 315.56,592.80 315.07,596.09 314.59,599.43 314.13,602.81 313.69,606.20 313.29,609.60 312.93,612.98 312.62,616.33 312.36,619.63 312.17,622.86 312.03,626.02 311.98,629.07 312.00,632.00 312.16,634.96 312.49,637.85 312.97,640.68 313.57,643.47 314.29,646.21 315.09,648.92 315.96,651.62 316.87,654.31 317.81,657.00 318.76,659.71 319.69,662.44 320.58,665.20 321.42,668.01 322.18,670.87 322.84,673.80 323.38,676.80 323.78,679.89 324.03,683.08 324.09,686.37 323.96,689.78 323.60,693.32 323.00,697.00 322.53,699.28 322.00,701.65 321.41,704.11 320.75,706.64 320.04,709.26 319.27,711.94 318.44,714.69 317.56,717.49 316.64,720.34 315.66,723.24 314.65,726.18 313.58,729.15 312.48,732.15 311.34,735.17 310.17,738.21 308.96,741.25 307.72,744.31 306.46,747.35 305.16,750.39 303.84,753.42 302.50,756.43 301.15,759.41 299.77,762.36 298.38,765.27 296.98,768.14 295.56,770.95 294.14,773.72 292.71,776.42 291.28,779.05 289.85,781.62 288.42,784.10 287.00,786.50 285.58,788.80 284.16,791.01 282.76,793.12 281.37,795.12 280.00,797.00 277.76,799.84 275.43,802.49 273.02,804.97 270.54,807.28 268.01,809.43 265.42,811.44 262.78,813.30 260.12,815.04 257.42,816.66 254.71,818.17 252.00,819.57 249.28,820.89 246.58,822.12 243.89,823.28 241.23,824.38 238.61,825.42 236.03,826.42 233.50,827.38 231.04,828.32 228.65,829.24 226.34,830.15 224.12,831.07 222.00,832.00 218.35,833.53 214.76,834.82 211.23,835.88 207.79,836.76 204.47,837.46 201.29,838.03 198.27,838.48 195.43,838.84 192.80,839.13 190.39,839.38 188.24,839.62 186.36,839.87 184.77,840.16 185.00,872.00 155.00,886.00 138.00,894.00 137.17,914.77" fill="none" stroke="#f4ca78" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6 5" marker-end="url(#arrow)"/>
 <circle cx="137.2" cy="914.8" r="4" fill="#f4ca78"/>
 <text x="67.2" y="933.8" class="label">TC167 crash</text>

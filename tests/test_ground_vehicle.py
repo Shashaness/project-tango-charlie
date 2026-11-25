@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from engine.camera import ORBIT_SENSITIVITY
 from engine.driving_camera import DrivingCamera
 from engine.game import Game
 from engine.jeep_asset import JeepVisual, jeep_access_points
@@ -146,14 +147,19 @@ class OccupancyTests(unittest.TestCase):
         self.game.input.interact_pressed = False
 
     def walk(self, target, limit=350):
-        camera = self.game.pedestrian_camera
+        pilot = self.control.pilot
+        heading = target - pilot.position
+        heading[1] = 0
+        if np.linalg.norm(heading) < 0.35:
+            return
+        pilot.forward[:] = heading / np.linalg.norm(heading)
+        pilot.movement_direction(0, 0)
         self.game.input.pilot_advance = 1
         self.game.input.pilot_run = True
         for _ in range(limit):
             offset = target - self.control.pilot.position
             if np.linalg.norm(offset[[0, 2]]) < 0.35:
                 break
-            camera.orbit_yaw = math.atan2(offset[0], offset[2])
             self.game.update(1 / 60)
         self.game.input.pilot_advance = 0
         self.game.input.pilot_run = False
@@ -190,6 +196,14 @@ class OccupancyTests(unittest.TestCase):
         self.assertIs(self.control.mode, ControlMode.GROUND_VEHICLE)
         self.assertIs(self.control.active.occupant, pilot)
         self.assertIs(self.control.active.vehicle, self.jeep)
+        heading = self.jeep.heading
+        self.game.camera_input.drag = (180, 12)
+        self.game.update(1 / 60)
+        self.assertAlmostEqual(self.game.driving_camera.orbit_yaw, -180 * ORBIT_SENSITIVITY)
+        self.assertAlmostEqual(
+            self.game.driving_camera.orbit_pitch, -0.23 - 12 * ORBIT_SENSITIVITY
+        )
+        self.assertEqual(self.jeep.heading, heading)
 
         self.game.input.toggle_parking_brake = True
         self.game.update(1 / 30)

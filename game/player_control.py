@@ -119,6 +119,17 @@ class Pilot:
         self.elapsed = 0.0
         self._accumulator = 0.0
         self._jump = False
+        self._movement_input = None
+        self._movement_direction = np.zeros(3)
+
+    def movement_direction(self, strafe, advance):
+        keys = (strafe, advance)
+        if keys != self._movement_input:
+            # Hold the requested direction as the pilot turns to face it.
+            direction = self.forward * advance + np.cross(self.forward, UP) * strafe
+            self._movement_direction = direction / max(1, np.linalg.norm(direction))
+            self._movement_input = keys
+        return self._movement_direction
 
     def update(self, dt, space, direction, run=False, jump=False):
         self._jump |= jump

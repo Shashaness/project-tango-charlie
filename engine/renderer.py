@@ -500,8 +500,11 @@ class Renderer:
                 (1, 2, 6, 5),
             )
             vertices = []
-            for lower, upper, rgb in scene.render_rows():
+            static = ((*row, None) for row in scene.render_rows())
+            for lower, upper, rgb, transform in (*static, *scene.oriented_boxes()):
                 points = lower + corners * (upper - lower)
+                if transform is not None:
+                    points = points @ transform[:3, :3].T + transform[:3, 3]
                 for face, shade in zip(faces, (0.78, 0.87, 0.60, 1.0, 0.73, 0.91), strict=True):
                     color = np.asarray(rgb) * shade
                     vertices.extend((*points[face[index]], *color) for index in (0, 1, 2, 0, 2, 3))

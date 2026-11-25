@@ -15,7 +15,7 @@ On the legacy layout, the maintenance hangar is about 540 m away and Q001 begins
 - **Enter** boards or exits, **P** releases the parking brake, **WASD** drives, and **Space** brakes.
 - **I** opens the journal, **N** advances its entries while open, and **U** cycles general hints. The HUD provides the current objective and transient completion messages. It uses no undiscovered entity waypoints.
 
-Q001 requires all seven objectives and 12 m of actual powered Jeep movement by default. The `drive` objective's `distance_m` controls the threshold. The campaign measures horizontal travel from the driving simulation while Kara occupies the Jeep, applies throttle, and has wheel contact. Parking-brake and stationary checks prevent boarding or idling from counting. Q002 becomes available and displays as awaiting future content.
+Q001 requires all seven objectives and 12 m of actual powered Jeep movement by default. The `drive` objective's `distance_m` controls the threshold. The campaign measures horizontal travel from the driving simulation while Kara occupies the Jeep, applies throttle, and has wheel contact. Parking-brake and stationary checks prevent boarding or idling from counting. On legacy Q1.1 saves, Q002 becomes available and displays as awaiting future content.
 
 ## Quest schema and lifecycle
 
@@ -43,13 +43,13 @@ Inventory, recovery trolley, cargo, repair, and signal investigation belong to t
 
 ## Q1.2A expansion and save compatibility
 
-The expanded Arrival world introduced the four-building compound. In the Q1.2C layout, the crash is 89 m from the compound courtyard and 559 m from Hangar A. The nearest city boundary is 4.4 km from the wreck. The compound has four buildings and a paved route to the airport. Q001 now ends at the maintenance hangar after Kara has operated the Jeep and reached the airport. Q002 covers the office key, personnel access, gate opening, and equipment inspection. Restoration and towing remain future objectives.
+The expanded Arrival world introduced the four-building compound. In the Q1.2C layout, the crash is 89 m from the compound courtyard and 559 m from Hangar A. The nearest city boundary is 4.4 km from the wreck. The compound has four buildings and a paved route to the airport. Q001 now ends at the maintenance hangar after Kara has operated the Jeep and reached the airport. Q002 covers the office key, personnel access, gate opening, and equipment inspection. Q1.3A adds playable trolley power restoration. Towing remains a future objective.
 
 Use **T** for the selected contextual action, **O** to cycle nearby objects, and **Shift+T** to inspect a selected object without changing its state. **I**, **N**, and **U** retain journal and hint functions. Unlock and open the personnel door with separate actions. The gate control is inside Hangar B. Both panels lift with their collisions and may reopen if their closing paths are occupied.
 
 Schema v3 persists object positions along their animation, targets, lock flags, key ownership and discovery, control use, journal observations, and campaign state. The loader retains v1/v2 saves on the Q1.1/Q1.2 geography and quest definitions, preserving actors and completed history. To play the new geography while retaining the old file, run `python main.py --campaign --campaign-save saves/arrival-expanded.json`. Explicit `--new-campaign` replaces the selected save. See the [interactive asset requirements](Q12A_ASSET_REQUIREMENTS.md).
 
-New saves use the Q1.2C layout. Existing Q1.2A and Q1.2B saves retain their original geography and saved actor positions. To start separately, run `python main.py --campaign --campaign-save saves/arrival-q12c.json`. See the [Arrival layout map](ARRIVAL_WORLD_LAYOUT.md) for measured placements and a separate-save launch command.
+New saves use the Q1.2C layout. Existing Q1.2A and Q1.2B saves retain their geographical revision and saved actor positions. Q1.3A adds recovery equipment to the corresponding airport. To start separately, run `python main.py --campaign --campaign-save saves/arrival-q12c.json`. See the [Arrival layout map](ARRIVAL_WORLD_LAYOUT.md) for measured placements and a separate-save launch command.
 
 ## Navigation and survey controls
 
@@ -66,3 +66,9 @@ When proposing, implementing, modifying, or verifying missions, update the [miss
 Interaction results briefly appear at the upper left and remain available through the existing General feedback and session Log. The upper-left card stacks below an active completion banner when both cards need the same horizontal space.
 
 **O** also shows the selected object, its position in the nearby list, and the current action in the upper-left card. **Shift+T**, or **T** when the current action is Inspect, shows the inspection result there. General keeps the current action and any inspection result for the selected object after the card fades. See the [terrestrial interface reference](HUD1_TERRESTRIAL_INTERFACE.md).
+
+## Q1.3A battery recovery
+
+After the Hangar B access and equipment objectives, inspect ATAT-773 and use the Jeep to bring a compatible battery from Hangar C. The original power unit remains a physical object after removal. Verify the restored controls by inspecting the trolley. Q002 remains active for later crane and recovery preparation. The crane card can be collected early at the control tower without activating crane operation.
+
+Expanded saves migrate from schema 3 to 4 when next written. Existing actors, inventory, and geographical layout IDs carry forward. See [recovery equipment](Q13_RECOVERY_EQUIPMENT.md), [power](PROTONIC_ENERGY_ARCHITECTURE.md), and [cargo](PHYSICAL_CARGO_ARCHITECTURE.md).

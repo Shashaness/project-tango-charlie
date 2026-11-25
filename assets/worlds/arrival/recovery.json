@@ -1,0 +1,398 @@
+{
+  "objects": {
+    "battery_station": {
+      "type": "equipment",
+      "position": [
+        306,
+        1,
+        4600
+      ],
+      "size": [
+        3.8,
+        0.9,
+        0.85
+      ],
+      "color": [
+        0.3,
+        0.35,
+        0.37
+      ],
+      "name": "BATTERY SERVICE STATION",
+      "solid": true,
+      "description": "INDUSTRIAL BATTERY SERVICE STATION. CHARGING STATUS UNKNOWN."
+    },
+    "battery_rack": {
+      "type": "scenery",
+      "position": [
+        306,
+        0.28,
+        4600
+      ],
+      "size": [
+        4.8,
+        0.56,
+        2.3
+      ],
+      "color": [
+        0.3,
+        0.35,
+        0.37
+      ],
+      "solid": true
+    },
+    "service_storage": {
+      "type": "scenery",
+      "position": [
+        328,
+        1,
+        4604
+      ],
+      "size": [
+        4,
+        2,
+        4
+      ],
+      "color": [
+        0.3,
+        0.35,
+        0.37
+      ],
+      "solid": true
+    },
+    "battery_a": {
+      "type": "cargo",
+      "position": [
+        304.65,
+        0.865,
+        4599.35
+      ],
+      "size": [
+        1.2192,
+        0.6096,
+        0.6096
+      ],
+      "color": [
+        0.77,
+        0.44,
+        0.17
+      ],
+      "name": "INDUSTRIAL BATTERY A"
+    },
+    "battery_b": {
+      "type": "cargo",
+      "position": [
+        307.35,
+        0.865,
+        4599.35
+      ],
+      "size": [
+        1.2192,
+        0.6096,
+        0.6096
+      ],
+      "color": [
+        0.77,
+        0.44,
+        0.17
+      ],
+      "name": "INDUSTRIAL BATTERY B"
+    },
+    "battery_original": {
+      "type": "cargo",
+      "position": [
+        312.9,
+        0.32,
+        4470
+      ],
+      "size": [
+        1.2192,
+        0.6096,
+        0.6096
+      ],
+      "color": [
+        0.54,
+        0.36,
+        0.22
+      ],
+      "name": "ATAT-773 ORIGINAL BATTERY"
+    },
+    "trolley_battery_bay": {
+      "type": "equipment",
+      "position": [
+        312.4,
+        0.65,
+        4470
+      ],
+      "size": [
+        0.3,
+        0.45,
+        0.35
+      ],
+      "color": [
+        0.3,
+        0.35,
+        0.37
+      ],
+      "name": "ATAT-773 BATTERY BAY",
+      "marker": true,
+      "priority_offset": 0.4
+    },
+    "jeep_cargo_bay": {
+      "type": "equipment",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "size": [
+        0.55,
+        0.55,
+        0.45
+      ],
+      "color": [
+        0.3,
+        0.35,
+        0.37
+      ],
+      "name": "JEEP CARGO AREA",
+      "marker": true,
+      "reach": 1.7
+    },
+    "control_tower_base": {
+      "type": "scenery",
+      "position": [
+        190,
+        3.8,
+        4270
+      ],
+      "size": [
+        5.5,
+        7.6,
+        5.5
+      ],
+      "color": [
+        0.3,
+        0.35,
+        0.37
+      ],
+      "solid": true
+    },
+    "control_tower_cab": {
+      "type": "scenery",
+      "position": [
+        190,
+        8.9,
+        4270
+      ],
+      "size": [
+        8,
+        2.6,
+        8
+      ],
+      "color": [
+        0.3,
+        0.35,
+        0.37
+      ]
+    },
+    "tower_card_shelf": {
+      "type": "scenery",
+      "position": [
+        187.04,
+        0.51,
+        4269.8
+      ],
+      "size": [
+        0.37,
+        1.02,
+        0.68
+      ],
+      "color": [
+        0.3,
+        0.35,
+        0.37
+      ],
+      "solid": true
+    },
+    "crane_access_card": {
+      "type": "item",
+      "position": [
+        186.99,
+        1.035,
+        4269.8
+      ],
+      "size": [
+        0.14,
+        0.026,
+        0.09
+      ],
+      "color": [
+        0.24,
+        0.68,
+        0.62
+      ],
+      "name": "CRN-329 ACCESS CARD",
+      "description": "VEHICLE ACCESS CARD. AUTHORIZED FOR CRN-329 ONLY."
+    },
+    "crn_chassis": {
+      "type": "scenery",
+      "position": [
+        322,
+        0.72,
+        4483
+      ],
+      "size": [
+        3.4,
+        1.04,
+        6.7
+      ],
+      "color": [
+        0.42,
+        0.38,
+        0.26
+      ],
+      "solid": true
+    },
+    "crn_cab": {
+      "type": "scenery",
+      "position": [
+        322.8,
+        1.8,
+        4485
+      ],
+      "size": [
+        1.7,
+        1.6,
+        1.8
+      ],
+      "color": [
+        0.47,
+        0.41,
+        0.3
+      ],
+      "solid": true
+    },
+    "crn_boom": {
+      "type": "scenery",
+      "position": [
+        321.6,
+        2.7,
+        4482
+      ],
+      "size": [
+        0.65,
+        0.45,
+        7.6
+      ],
+      "color": [
+        0.6,
+        0.5,
+        0.31
+      ],
+      "solid": true
+    }
+  },
+  "cargo": {
+    "bay_capacity": [
+      1.32,
+      0.75,
+      0.7
+    ],
+    "jeep_load": [
+      0,
+      0.43,
+      -3.73
+    ],
+    "jeep_access": [
+      0,
+      0.66,
+      -4.13
+    ],
+    "handle_distance": 5.0,
+    "carry_speed": 0.5,
+    "batteries": {
+      "battery_a": {
+        "interface": "atat-industrial",
+        "condition": "serviceable",
+        "charge": 0.62,
+        "slot": "rack"
+      },
+      "battery_b": {
+        "interface": "atat-industrial",
+        "condition": "deteriorated",
+        "charge": 0.13,
+        "slot": "rack"
+      },
+      "battery_original": {
+        "interface": "atat-industrial",
+        "condition": "serviceable",
+        "charge": 0,
+        "slot": "installed"
+      }
+    },
+    "jeep_interfaces": [
+      "atat-industrial"
+    ],
+    "jeep_carrier": [
+      {
+        "center": [
+          0,
+          0.065,
+          -3.73
+        ],
+        "size": [
+          1.32,
+          0.12,
+          0.72
+        ],
+        "color": [
+          0.3,
+          0.32,
+          0.32
+        ]
+      },
+      {
+        "center": [
+          0,
+          -0.14,
+          -2.96
+        ],
+        "size": [
+          0.19,
+          0.12,
+          1.65
+        ],
+        "color": [
+          0.26,
+          0.28,
+          0.28
+        ]
+      }
+    ],
+    "transport_minimum": 20
+  },
+  "credentials": {
+    "office_key": {
+      "level": "maintenance",
+      "facilities": [
+        "hangar_b"
+      ],
+      "equipment": [],
+      "vehicles": []
+    },
+    "crane_access_card": {
+      "level": "operator",
+      "facilities": [],
+      "equipment": [],
+      "vehicles": [
+        "crn-329"
+      ]
+    }
+  },
+  "power": {
+    "trolley": {
+      "interface": "atat-industrial",
+      "minimum_charge": 0.25
+    }
+  }
+}

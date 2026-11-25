@@ -1,0 +1,10 @@
+{
+  "battery_fault": "The recovery platform is mechanically intact, but its protonic battery is dead. I could tow it as it is, but without power there's no way to stabilize it or secure TC167 once she's on board.\n\nI need another battery. I'd rather not try charging this one. Old protonic batteries can be unpredictable, and I've seen what happens when one decides it doesn't want to be charged.",
+  "visit_c": "There's another hangar nearby. It looks like some kind of equipment servicing facility. If I'm lucky, they might have kept replacement power units here.",
+  "station_found": "Two industrial protonic batteries. Finally, something useful.\n\nThey're considerably larger than anything I'd want to carry back to the recovery hangar. I'll need to bring the Jeep around.",
+  "battery_eligible": "One of these still appears to have usable charge. How it managed to retain it after all this time is another question entirely. For now, I'm not going to complain.",
+  "battery_loaded": "That thing is heavy. I managed to get it into the back of the Jeep, but I certainly wouldn't want to carry it any farther than that.",
+  "battery_installed": "The replacement battery is installed. The recovery platform's controls are responding.\n\nThat's one less problem between me and getting TC167 back where she belongs.",
+  "crane_authorization_exam": "The crane requires its own access card. The maintenance card won't authorize it.\n\nEvery vehicle I've ever operated has had its own credentials. I suppose I was lucky with the Jeep. Someone must have left its card inside.",
+  "crane_card_taken": "I found an access card near the control tower. Its designation matches the crane.\n\nPerhaps my luck hasn't entirely run out."
+}

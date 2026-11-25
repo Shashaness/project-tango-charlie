@@ -26,7 +26,7 @@ exit, movement, camera, and re-entry tests.
 ## Play
 
 The default start parks the TC167 in the open-front mechanics hangar. Press
-**Enter** to exit. Use **WASD** to move relative to the camera, either **Shift**
+**Enter** to exit. Use **WASD** to move relative to the pilot's heading, either **Shift**
 key to run, and **Space** to jump. Left mouse drag orbits. Scroll inward to
 approach eye level and outward to return to third person. **Home** or
 **Backspace** resets the on-foot view. Press **Enter** while grounded near an

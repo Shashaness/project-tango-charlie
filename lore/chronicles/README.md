@@ -8,3 +8,7 @@ The opening sequence of **Project Tango Charlie — The Return to Earth** is und
 3. [Chapter II — The Arrival](002_the_arrival.md) depicts the descent, crash, and Kara's departure toward the maintenance hangar.
 
 The prologue and Chapter I remain proposed. The owner approved Chapter II as canon during Q1.2 review, along with a targeted consistency edit to Chapter I. See the [approval record](../CANON.md#approval-record). Use [Canon](../CANON.md) for objective facts and the [mystery register](../MYSTERIES.md) for unanswered questions.
+
+## Historical interlude
+
+[The Price of Infinity](the_price_of_infinity.md) is an approved archive account of the Protonic Age, the First Intergalactic War, and Kara's return operation.

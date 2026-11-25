@@ -14,3 +14,7 @@ All questions below are **UNRESOLVED**. The supporting observations establish th
 | Can Earth actually be restored? | Testing the feasibility of restoration is a mission objective. [Canon](CANON.md) |
 
 The [Chronicles](chronicles/README.md) and [Kara's journal](journals/kara_voss/README.md) contain proposed details relevant to these questions. Any resolution requires explicit approval.
+
+## Protonic Age questions
+
+The exact current terrestrial year, the storage mechanism and charging requirements of protonic batteries, and the reason a service-station battery retains charge remain open. The historical interlude leaves the transmission mystery unresolved. [Protonic Age](history/protonic_age.md)

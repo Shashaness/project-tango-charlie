@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from engine.asset_paths import asset_path
+from engine.camera import ORBIT_SENSITIVITY
 from engine.game import Game
 from engine.pedestrian_camera import PedestrianCamera
 from engine.pilot_asset import PilotAsset
@@ -93,8 +94,7 @@ class PlayerControlTests(unittest.TestCase):
         exit_pos = pilot.position.copy()
 
         # Walk alongside the tail through the existing west doorway and onto the apron.
-        camera = self.game.pedestrian_camera
-        camera.orbit_yaw = -np.pi / 2
+        pilot.forward[:] = WEST
         self.game.input.pilot_advance = 1
         self.game.input.pilot_run = True
         self.game.input.toggle_configuration = self.game.input.space_pressed = True
@@ -223,6 +223,87 @@ class PlayerControlTests(unittest.TestCase):
         )
         camera.observe(pilot, PedestrianSpace(ground, self.vehicle), 1)
         self.assertGreater(camera.position[0], 290.2)
+
+    def on_foot_trial(self, heading=(0, 0, 1)):
+        pilot = self.control.pilot = Pilot((1000, 0, 3000), heading)
+        ground = ground_with(self.game.world.ground, [])
+        ground.height = lambda _: 0
+        self.control.space.ground = ground
+        self.control.mode = ControlMode.ON_FOOT
+        self.game.pedestrian_camera.begin(pilot)
+        self.game.input.pilot_jump = False
+        self.game.input.interact_pressed = False
+        return pilot
+
+    def test_forward_walk_and_run_are_straight_through_a_full_mouse_orbit(self):
+        game = self.game
+        camera = game.pedestrian_camera
+        steps = 60
+        try:
+            for running, clip, speed in ((False, "Walk", 3), (True, "Run", 6)):
+                with self.subTest(clip=clip):
+                    paths = []
+                    for orbit in (False, True):
+                        pilot = self.on_foot_trial()
+                        game.input.pilot_advance = 1
+                        game.input.pilot_strafe = 0
+                        game.input.pilot_run = running
+                        frames = []
+                        for _ in range(steps):
+                            if orbit:
+                                game.camera_input.drag = (np.pi * 2 / steps / ORBIT_SENSITIVITY, 0)
+                            game.update(1 / 60)
+                            frames.append(np.r_[pilot.position, pilot.forward, pilot.velocity])
+                        paths.append(frames)
+                        self.assertEqual(pilot.clip, clip)
+                        self.assertAlmostEqual(pilot.velocity[2], speed, places=5)
+                    np.testing.assert_array_equal(*paths)
+                    self.assertAlmostEqual(camera.orbit_yaw, -2 * np.pi)
+        finally:
+            game.input.pilot_advance = 0
+            game.input.pilot_run = False
+
+    def test_wasd_uses_avatar_heading_at_all_camera_quarter_turns(self):
+        game = self.game
+        cases = (
+            ((0, 1), WEST),
+            ((0, -1), EAST),
+            ((1, 0), (0, 0, -1)),
+            ((-1, 0), (0, 0, 1)),
+            ((1, 1), (-1 / np.sqrt(2), 0, -1 / np.sqrt(2))),
+        )
+        try:
+            for offset in np.arange(4) * np.pi / 2:
+                for keys, expected in cases:
+                    with self.subTest(offset=offset, keys=keys):
+                        pilot = self.on_foot_trial(WEST)
+                        start = pilot.position.copy()
+                        game.pedestrian_camera.orbit_yaw += offset
+                        game.input.pilot_strafe, game.input.pilot_advance = keys
+                        for _ in range(36):
+                            game.update(1 / 60)
+                        delta = pilot.position - start
+                        np.testing.assert_allclose(
+                            delta / np.linalg.norm(delta), expected, atol=1e-10
+                        )
+                        np.testing.assert_allclose(pilot.forward, expected, atol=1e-10)
+        finally:
+            game.input.pilot_strafe = game.input.pilot_advance = 0
+
+    def test_mouse_orbit_while_idle_leaves_avatar_pose_unchanged(self):
+        game = self.game
+        pilot = self.on_foot_trial(WEST)
+        game.input.pilot_strafe = game.input.pilot_advance = 0
+        start = pilot.position.copy()
+        camera = game.pedestrian_camera
+        initial = camera.orbit_yaw, camera.orbit_pitch
+        game.camera_input.drag = (120, 65)
+        game.update(1 / 30)
+        self.assertNotEqual((camera.orbit_yaw, camera.orbit_pitch), initial)
+        np.testing.assert_array_equal(pilot.position, start)
+        np.testing.assert_array_equal(pilot.forward, WEST)
+        np.testing.assert_array_equal(pilot.velocity, ZERO)
+        self.assertEqual(pilot.clip, "Idle")
 
     def test_original_skinned_pilot_animates(self):
         asset = PilotAsset(asset_path("models/characters/pilot.glb"))
