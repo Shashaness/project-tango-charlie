@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1110" viewBox="0 0 1080 1110">
+<rect width="1080" height="1110" fill="#101e25"/>
+<style>text{font:14px system-ui;fill:#f0eadb}.title{font:bold 31px system-ui}.caption{fill:#b9c7ca}.label{font:bold 13px system-ui;paint-order:stroke;stroke:#172b32;stroke-width:4;stroke-linejoin:round}.small{font:12px system-ui}</style>
+<text x="39" y="54" class="title">Arrival world layout</text>
+<text x="40" y="80" class="caption">Project Tango Charlie · Q1.2C · World-local meters</text>
+<defs><clipPath id="local"><rect x="38" y="110" width="533" height="864" rx="10"/></clipPath><marker id="arrow" markerWidth="9" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#f4ca78"/></marker></defs>
+<g clip-path="url(#local)">
+<rect x="38" y="110" width="533" height="864" fill="#263b41"/>
+<polyline points="48.00,110.00 48.00,960.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="98.00,110.00 98.00,960.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="148.00,110.00 148.00,960.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="198.00,110.00 198.00,960.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="248.00,110.00 248.00,960.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="298.00,110.00 298.00,960.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="348.00,110.00 348.00,960.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="398.00,110.00 398.00,960.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="448.00,110.00 448.00,960.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="498.00,110.00 498.00,960.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,160.00 508.00,160.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,210.00 508.00,210.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,260.00 508.00,260.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,310.00 508.00,310.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,360.00 508.00,360.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,410.00 508.00,410.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,460.00 508.00,460.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,510.00 508.00,510.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,560.00 508.00,560.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,610.00 508.00,610.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,660.00 508.00,660.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,710.00 508.00,710.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,760.00 508.00,760.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,810.00 508.00,810.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,860.00 508.00,860.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<polyline points="38.00,910.00 508.00,910.00" fill="none" stroke="#344a50" stroke-width="1" stroke-linejoin="round" />
+<rect x="75.5" y="-1280.0" width="45.0" height="2400.0" fill="#809398"/>
+<polyline points="98.00,-1280.00 98.00,1120.00" fill="none" stroke="#dde2df" stroke-width="1" stroke-linejoin="round" stroke-dasharray="9 9"/>
+<rect x="153.0" y="-1280.0" width="20.0" height="2400.0" fill="#647b83"/>
+<rect x="98.0" y="-1140.0" width="100.0" height="20.0" fill="#647b83"/>
+<rect x="98.0" y="-90.0" width="100.0" height="20.0" fill="#647b83"/>
+<rect x="98.0" y="960.0" width="100.0" height="20.0" fill="#647b83"/>
+<rect x="98.0" y="408.0" width="110.0" height="24.0" fill="#647b83"/>
+<rect x="203.0" y="170.0" width="250.0" height="500.0" fill="#546a72"/>
+<rect x="167.8" y="824.7" width="34.0" height="29.0" fill="#546a72"/>
+<rect x="353.0" y="195.0" width="90.0" height="110.0" fill="#56605f"/>
+<polyline points="184.77,840.16 186.36,839.87 188.24,839.62 190.39,839.38 192.80,839.13 195.43,838.84 198.27,838.48 201.29,838.03 204.47,837.46 207.79,836.76 211.23,835.88 214.76,834.82 218.35,833.53 222.00,832.00 224.12,831.07 226.34,830.15 228.65,829.24 231.04,828.32 233.50,827.38 236.03,826.42 238.61,825.42 241.23,824.38 243.89,823.28 246.58,822.12 249.28,820.89 252.00,819.57 254.71,818.17 257.42,816.66 260.12,815.04 262.78,813.30 265.42,811.44 268.01,809.43 270.54,807.28 273.02,804.97 275.43,802.49 277.76,799.84 280.00,797.00 281.37,795.12 282.76,793.12 284.16,791.01 285.58,788.80 287.00,786.50 288.42,784.10 289.85,781.62 291.28,779.05 292.71,776.42 294.14,773.72 295.56,770.95 296.98,768.14 298.38,765.27 299.77,762.36 301.15,759.41 302.50,756.43 303.84,753.42 305.16,750.39 306.46,747.35 307.72,744.31 308.96,741.25 310.17,738.21 311.34,735.17 312.48,732.15 313.58,729.15 314.65,726.18 315.66,723.24 316.64,720.34 317.56,717.49 318.44,714.69 319.27,711.94 320.04,709.26 320.75,706.64 321.41,704.11 322.00,701.65 322.53,699.28 323.00,697.00 323.60,693.32 323.96,689.78 324.09,686.37 324.03,683.08 323.78,679.89 323.38,676.80 322.84,673.80 322.18,670.87 321.42,668.01 320.58,665.20 319.69,662.44 318.76,659.71 317.81,657.00 316.87,654.31 315.96,651.62 315.09,648.92 314.29,646.21 313.57,643.47 312.97,640.68 312.49,637.85 312.16,634.96 312.00,632.00 311.98,629.07 312.03,626.02 312.17,622.86 312.36,619.63 312.62,616.33 312.93,612.98 313.29,609.60 313.69,606.20 314.13,602.81 314.59,599.43 315.07,596.09 315.56,592.80 316.06,589.58 316.56,586.45 317.06,583.43 317.54,580.52 318.01,577.75 318.44,575.14 318.85,572.70 319.21,570.45 319.53,568.40 319.79,566.58 320.00,565.00" fill="none" stroke="#93b2b5" stroke-width="18.0" stroke-linejoin="round" />
+<polyline points="184.77,840.16 186.36,839.87 188.24,839.62 190.39,839.38 192.80,839.13 195.43,838.84 198.27,838.48 201.29,838.03 204.47,837.46 207.79,836.76 211.23,835.88 214.76,834.82 218.35,833.53 222.00,832.00 224.12,831.07 226.34,830.15 228.65,829.24 231.04,828.32 233.50,827.38 236.03,826.42 238.61,825.42 241.23,824.38 243.89,823.28 246.58,822.12 249.28,820.89 252.00,819.57 254.71,818.17 257.42,816.66 260.12,815.04 262.78,813.30 265.42,811.44 268.01,809.43 270.54,807.28 273.02,804.97 275.43,802.49 277.76,799.84 280.00,797.00 281.37,795.12 282.76,793.12 284.16,791.01 285.58,788.80 287.00,786.50 288.42,784.10 289.85,781.62 291.28,779.05 292.71,776.42 294.14,773.72 295.56,770.95 296.98,768.14 298.38,765.27 299.77,762.36 301.15,759.41 302.50,756.43 303.84,753.42 305.16,750.39 306.46,747.35 307.72,744.31 308.96,741.25 310.17,738.21 311.34,735.17 312.48,732.15 313.58,729.15 314.65,726.18 315.66,723.24 316.64,720.34 317.56,717.49 318.44,714.69 319.27,711.94 320.04,709.26 320.75,706.64 321.41,704.11 322.00,701.65 322.53,699.28 323.00,697.00 323.60,693.32 323.96,689.78 324.09,686.37 324.03,683.08 323.78,679.89 323.38,676.80 322.84,673.80 322.18,670.87 321.42,668.01 320.58,665.20 319.69,662.44 318.76,659.71 317.81,657.00 316.87,654.31 315.96,651.62 315.09,648.92 314.29,646.21 313.57,643.47 312.97,640.68 312.49,637.85 312.16,634.96 312.00,632.00 311.98,629.07 312.03,626.02 312.17,622.86 312.36,619.63 312.62,616.33 312.93,612.98 313.29,609.60 313.69,606.20 314.13,602.81 314.59,599.43 315.07,596.09 315.56,592.80 316.06,589.58 316.56,586.45 317.06,583.43 317.54,580.52 318.01,577.75 318.44,575.14 318.85,572.70 319.21,570.45 319.53,568.40 319.79,566.58 320.00,565.00" fill="none" stroke="#3b5155" stroke-width="1.2" stroke-linejoin="round" stroke-dasharray="4 5"/>
+<polygon points="353.00,365.00 443.00,365.00 443.00,475.00 353.00,475.00" fill="#a69b76" stroke="#292a24" stroke-width="2"/>
+<text x="398.0" y="420.0" class="label">Hangar A</text>
+<polygon points="353.00,495.00 443.00,495.00 443.00,605.00 353.00,605.00" fill="#a69b76" stroke="#292a24" stroke-width="2"/>
+<text x="398.0" y="550.0" class="label">Hangar B</text>
+<polygon points="168.57,825.41 168.57,802.91 194.97,802.91 194.97,825.41" fill="#a69b76" stroke="#292a24" stroke-width="2"/>
+<polyline points="181.77,814.16 125.00,780.00" fill="none" stroke="#d0c5a9" stroke-width="0.9" stroke-linejoin="round" />
+<text x="125.0" y="780.0" class="label">Jeep garage</text>
+<polygon points="205.67,849.26 221.87,849.26 221.87,869.06 205.67,869.06" fill="#a69b76" stroke="#292a24" stroke-width="2"/>
+<text x="245.0" y="871.0" class="label">Equipment shed</text>
+<polygon points="165.87,855.06 149.67,855.06 149.67,835.26 165.87,835.26" fill="#a69b76" stroke="#292a24" stroke-width="2"/>
+<polyline points="157.77,845.16 94.00,835.00" fill="none" stroke="#d0c5a9" stroke-width="0.9" stroke-linejoin="round" />
+<text x="94.0" y="835.0" class="label">Storage</text>
+<polygon points="214.67,800.06 214.67,816.26 194.87,816.26 194.87,800.06" fill="#a69b76" stroke="#292a24" stroke-width="2"/>
+<polyline points="204.77,808.16 226.00,790.00" fill="none" stroke="#d0c5a9" stroke-width="0.9" stroke-linejoin="round" />
+<text x="226.0" y="790.0" class="label">Workshop</text>
+<polyline points="369.00,535.00 326.00,535.00 320.00,565.00 319.79,566.58 319.53,568.40 319.21,570.45 318.85,572.70 318.44,575.14 318.01,577.75 317.54,580.52 317.06,583.43 316.56,586.45 316.06,589.58 315.56,592.80 315.07,596.09 314.59,599.43 314.13,602.81 313.69,606.20 313.29,609.60 312.93,612.98 312.62,616.33 312.36,619.63 312.17,622.86 312.03,626.02 311.98,629.07 312.00,632.00 312.16,634.96 312.49,637.85 312.97,640.68 313.57,643.47 314.29,646.21 315.09,648.92 315.96,651.62 316.87,654.31 317.81,657.00 318.76,659.71 319.69,662.44 320.58,665.20 321.42,668.01 322.18,670.87 322.84,673.80 323.38,676.80 323.78,679.89 324.03,683.08 324.09,686.37 323.96,689.78 323.60,693.32 323.00,697.00 322.53,699.28 322.00,701.65 321.41,704.11 320.75,706.64 320.04,709.26 319.27,711.94 318.44,714.69 317.56,717.49 316.64,720.34 315.66,723.24 314.65,726.18 313.58,729.15 312.48,732.15 311.34,735.17 310.17,738.21 308.96,741.25 307.72,744.31 306.46,747.35 305.16,750.39 303.84,753.42 302.50,756.43 301.15,759.41 299.77,762.36 298.38,765.27 296.98,768.14 295.56,770.95 294.14,773.72 292.71,776.42 291.28,779.05 289.85,781.62 288.42,784.10 287.00,786.50 285.58,788.80 284.16,791.01 282.76,793.12 281.37,795.12 280.00,797.00 277.76,799.84 275.43,802.49 273.02,804.97 270.54,807.28 268.01,809.43 265.42,811.44 262.78,813.30 260.12,815.04 257.42,816.66 254.71,818.17 252.00,819.57 249.28,820.89 246.58,822.12 243.89,823.28 241.23,824.38 238.61,825.42 236.03,826.42 233.50,827.38 231.04,828.32 228.65,829.24 226.34,830.15 224.12,831.07 222.00,832.00 218.35,833.53 214.76,834.82 211.23,835.88 207.79,836.76 204.47,837.46 201.29,838.03 198.27,838.48 195.43,838.84 192.80,839.13 190.39,839.38 188.24,839.62 186.36,839.87 184.77,840.16 185.00,872.00 155.00,886.00 138.00,894.00 137.17,914.77" fill="none" stroke="#f4ca78" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6 5" marker-end="url(#arrow)"/>
+<circle cx="137.2" cy="914.8" r="4" fill="#f4ca78"/>
+<text x="67.2" y="933.8" class="label">TC167 crash</text>
+<circle cx="134.5" cy="895.7" r="4" fill="#f4ca78"/>
+<text x="143.5" y="890.7" class="label">Kara spawn</text>
+<circle cx="181.8" cy="810.2" r="4" fill="#f4ca78"/>
+<path d="M181.8 810.2l19 -39" stroke="#f4ca78"/>
+<text x="200.8" y="771.2" class="label">Jeep</text>
+<text x="208.0" y="340.0" class="label">Maintenance apron</text>
+<text x="78.0" y="260.0" class="label">Runway</text>
+<text x="102.0" y="488.0" class="label">Taxiway</text>
+<text x="326.0" y="680.0" class="label">Curved access road</text>
+<text x="242.0" y="845.0" class="label">Outlying service compound</text>
+<polyline points="184.77,839.16 219.00,848.00" fill="none" stroke="#d0c5a9" stroke-width="0.9" stroke-linejoin="round" />
+<text x="219.0" y="848.0" class="label">Yard</text>
+</g>
+<text x="617.0" y="132.0" class="label">Orientation</text>
+<path d="M655 216V154" stroke="#f4ca78" fill="none" marker-end="url(#arrow)"/>
+<path d="M655 216H725" stroke="#f4ca78" fill="none" marker-end="url(#arrow)"/>
+<path d="M655 216V258" stroke="#f4ca78" fill="none" marker-end="url(#arrow)"/>
+<text x="670.0" y="165.0" class="">North (−Z) toward city</text>
+<text x="735.0" y="221.0" class="">+X east</text>
+<text x="671.0" y="258.0" class="">+Z south</text>
+<path d="M620 300h100m-100 -5v10m50 -10v10m50 -10v10" stroke="#eee9dd"/>
+<text x="619.0" y="325.0" class="">0</text>
+<text x="660.0" y="325.0" class="">50</text>
+<text x="706.0" y="325.0" class="">100 m</text>
+<text x="617.0" y="382.0" class="label">Measured separations</text>
+<text x="617.0" y="410.0" class="">Crash to courtyard  89.3 m</text>
+<text x="617.0" y="435.0" class="">Crash to garage  110.1 m</text>
+<text x="617.0" y="460.0" class="">Crash to Hangar A  559.3 m</text>
+<text x="617.0" y="485.0" class="">Garage to Hangar A  449.6 m</text>
+<text x="617.0" y="510.0" class="">Access road centerline  350.8 m</text>
+<text x="617.0" y="553.0" class="label">Wider view</text>
+<rect x="617" y="568" width="390" height="380" rx="10" fill="#263b41"/>
+<rect x="734.5" y="609.5" width="81.0" height="81.0" fill="#a69b76"/>
+<text x="833.0" y="622.0" class="">Ruined city</text>
+<path d="M775.0 809.84L775.0 939.44" stroke="#809398" stroke-width="4"/>
+<circle cx="791.2" cy="901.64" r="5" fill="#f4ca78"/>
+<text x="833.0" y="892.0" class="">Arrival local area</text>
+<text x="647.0" y="923.0" class="small">City edge is about 4.4 km from the crash.</text>
+<path d="M42 991h54" stroke="#f4ca78" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="109.0" y="997.0" class="">Future recovery route (proposed)</text>
+<text x="40.0" y="1040.0" class="caption">Local map drawn from manifest placements and sampled access-road geometry.</text>
+</svg>

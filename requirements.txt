@@ -3,3 +3,4 @@ PyOpenGL
 PyOpenGL_accelerate
 numpy
 tifffile>=2024.8.30
+Pillow>=10

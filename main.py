@@ -76,22 +76,45 @@ def main():
         "--terrain-dir", help="directory of user-supplied HGT or WGS84 GeoTIFF elevation tiles"
     )
     parser.add_argument("--planet-tiles", type=Path, help="geographic asset registry directory")
-    parser.add_argument("--planet-seed", type=int, default=205)
+    parser.add_argument("--world-manifest", type=Path)
+    operating_mode = parser.add_mutually_exclusive_group()
+    operating_mode.add_argument("--campaign", action="store_true", help="Start or resume Arrival")
+    operating_mode.add_argument("--sandbox", action="store_true", help="Use the default sandbox")
+    parser.add_argument(
+        "--new-campaign", action="store_true", help="Replace an existing Arrival save"
+    )
+    parser.add_argument("--campaign-save", type=Path, help="Override the local Arrival save path")
+    parser.add_argument("--planet-seed", type=int)
     parser.add_argument(
         "--terrain-patch-span",
         type=float,
-        default=32000.0,
         help="coarse streaming root span in meters",
     )
-    parser.add_argument(
-        "--terrain-origin", nargs=2, type=float, metavar=("LAT", "LON"), default=(34.5, -111.5)
-    )
+    parser.add_argument("--terrain-origin", nargs=2, type=float, metavar=("LAT", "LON"))
     parser.add_argument(
         "--terrain-offset", type=float, help="source EGM96 elevation assigned to world Y=0"
     )
-    parser.add_argument("--terrain-budget", type=int, default=64)
-    parser.add_argument("--terrain-view-distance", type=float, default=16000.0)
+    parser.add_argument("--terrain-budget", type=int)
+    parser.add_argument("--terrain-view-distance", type=float)
     args = parser.parse_args()
+    if not args.campaign and (args.new_campaign or args.campaign_save):
+        parser.error("Campaign save options require --campaign")
+    if args.campaign and any(
+        (
+            args.world_manifest,
+            args.atmosphere,
+            args.defense_test,
+            args.vtol_test,
+            args.battledroid_test,
+            args.model_test,
+            args.prototype_test,
+            args.inspect_model,
+            args.vehicle_model,
+            args.legacy_animation,
+            args.no_gltf_animation,
+        )
+    ):
+        parser.error("Campaign mode uses the Arrival manifest and excludes sandbox presets")
     if args.inspect_model:
         from engine.gltf_loader import load_glb
 
@@ -115,22 +138,36 @@ def main():
         missiles_enabled=args.ai_weapons == "all",
         ecm_enabled=args.ai_ecm,
     )
-    from game.terrain import TerrainConfig
+    from game.world_manifest import default_definition, load_manifest
 
+    campaign = None
     try:
-        terrain_config = TerrainConfig(
-            planetary_seed=args.planet_seed,
-            side=args.terrain_patch_span,
-            **({"registry_directory": args.planet_tiles} if args.planet_tiles else {}),
-            latitude=args.terrain_origin[0],
-            longitude=args.terrain_origin[1],
-            elevation_offset=args.terrain_offset,
-            budget=args.terrain_budget,
-            cache_size=max(96, args.terrain_budget + 1),
-            view_distance=args.terrain_view_distance,
-            **({"directory": Path(args.terrain_dir)} if args.terrain_dir else {}),
-        )
-    except ValueError as error:
+        if args.campaign:
+            from game.arrival import DEFAULT_SAVE, open_campaign
+
+            campaign = open_campaign(args.campaign_save or DEFAULT_SAVE, new=args.new_campaign)
+        if campaign is not None:
+            definition = campaign.definition
+        else:
+            definition = (
+                load_manifest(args.world_manifest) if args.world_manifest else default_definition()
+            )
+        overrides = {
+            "planetary_seed": args.planet_seed,
+            "side": args.terrain_patch_span,
+            "registry_directory": args.planet_tiles,
+            "elevation_offset": args.terrain_offset,
+            "budget": args.terrain_budget,
+            "view_distance": args.terrain_view_distance,
+            "directory": Path(args.terrain_dir) if args.terrain_dir else None,
+        }
+        overrides = {key: value for key, value in overrides.items() if value is not None}
+        if args.terrain_origin:
+            overrides["latitude"], overrides["longitude"] = args.terrain_origin
+        if args.terrain_budget is not None:
+            overrides["cache_size"] = max(definition.terrain.cache_size, args.terrain_budget + 1)
+        terrain_config = replace(definition.terrain, **overrides)
+    except (ValueError, OSError) as error:
         parser.error(str(error))
     if args.no_gltf_animation and not args.legacy_animation:
         parser.error("--no-gltf-animation requires --legacy-animation")
@@ -140,6 +177,8 @@ def main():
         ai_parameters=parameters,
         locomotion_animation=not args.no_locomotion_animation,
         terrain_config=terrain_config,
+        world_manifest=definition,
+        campaign=campaign,
         vehicle_model_path=args.vehicle_model,
         gltf_animation=not args.no_gltf_animation,
         legacy_animation=args.legacy_animation,

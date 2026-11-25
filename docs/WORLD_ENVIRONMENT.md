@@ -1,7 +1,11 @@
 # M20.2 organic urban layout and airfield test environment
 
-The default game starts TC167 at rest in FIGHTER configuration on runway 36,
-in ATMOSPHERE. This is original procedural test scenery, not a city simulation.
+The default world now uses a versioned manifest and an authored primary
+hangar. See the [M24 world architecture guide](M24_WORLD_ARCHITECTURE.md)
+for placement, ground surfaces and environmental asset exports.
+
+The default game starts TC167 parked in the primary hangar in FIGHTER
+configuration and ATMOSPHERE. F4 resets the aircraft to runway 36.
 M20.2 varies the street/block plan, reserves parks, and adds district-specific
 parcels and buildings. M20.1 ground-flicker fixes are retained. Runway, reset,
 physics, animation, HUD and gameplay cameras retain their M20 implementations.
@@ -128,13 +132,11 @@ three hangars, control tower and perimeter roads sit beside the runway. The
 existing origin-area test cubes retain their development-test positions inside
 the city extent; they may intersect non-collidable scenery. The airfield is separate.
 
-`game.world_environment.RUNWAY` is the shared authoritative definition used by
-geometry, ground support, spawn/reset and tests. Spawn X,Z=(0,3580), 120 m inside
-the departure threshold. Y is computed from the lowest transformed vertex of
-TC167's canonical FIGHTER GLB, including its existing coordinate conversion:
-currently approximately 0.950000025 m. No model hierarchy or animation asset is
-modified. Threshold bars, centerline dashes and original block-digit 36/18 markings
-are static planar geometry at Y=0, with no separate pavement collider. Airport
+The manifest defines the default runway. The scene's runway serves
+geometry, runway contact and debug resets. F4 resets to X/Z=(0,3580), 120 m
+inside the departure threshold. The current Fighter uses deployed wheel
+anchors for ground clearance. Threshold bars, centerline dashes and block
+digits share the planar Y=0 pavement layer. Airport
 paving, buildings, dimensions, designation and departure heading stay in their
 M20 positions; only their surface representation and colors change.
 
@@ -207,16 +209,12 @@ Camera projection, controls and follow behavior stay unchanged. No shadows,
 clouds, weather, textures, LOD, culling, terrain deformation, per-frame scenery
 allocation or new dependencies are added. Smooth gameplay has not been benchmarked.
 
-All buildings, rooftops, hangars and towers remain **non-collidable**. Building
-footprints and parcel metadata now describe the new layout, but no static-world
-collision implementation exists to regenerate.
-Existing physics handles a flat surface and has no swept static-world collision
-interface. Building collision is explicitly deferred: a future implementation must
-integrate conservative swept volumes into all vehicle substeps, define safe sliding
-and aircraft impacts, and keep roof contacts separate from flat-ground landing
-telemetry. No partial per-frame point clamp is introduced. Do not use rooftops as
-landing surfaces. Weapons/AI retain their existing collision/terrain behavior and
-can pass through scenery. The compact city/airport ground joins the finite 32 km SRTM terrain domain while
+The runtime indexes city buildings and airport collision boxes for ground
+movement. In the primary hangar, collision markers from the authored GLB
+define the walls, roof, and storage. The repair station supplies its own
+equipment collider. The open entrance is shared by aircraft, vehicles, and
+the pilot. Rooftops are outside the shared walkable ground partition.
+The compact city/airport ground joins the finite 32 km SRTM terrain domain while
 physics retains its infinite plane. Static scene bounds stay within a few km of
 the origin, without floating-origin machinery.
 

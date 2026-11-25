@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "quests": [
+    {
+      "id": "Q001",
+      "title": "Remnants of Civilization",
+      "description": "TC167 crashed near the airport. Reach the maintenance hangar and find a way to move her.",
+      "owner": "pilot_01",
+      "classification": "main",
+      "entities": [
+        "hangar_01",
+        "hangar-jeep",
+        "tc167",
+        "service_garage"
+      ],
+      "objectives": [
+        {
+          "id": "airbase",
+          "title": "Reach the airbase",
+          "type": "reach",
+          "target": "hangar_01",
+          "stage": 0
+        },
+        {
+          "id": "hangar",
+          "title": "Enter the maintenance hangar",
+          "type": "reach",
+          "target": "hangar_01",
+          "stage": 1
+        },
+        {
+          "id": "service",
+          "title": "Explore the service buildings",
+          "type": "reach",
+          "target": "service_garage",
+          "stage": 2
+        },
+        {
+          "id": "discover",
+          "title": "Search for ground transportation",
+          "type": "discover",
+          "target": "hangar-jeep",
+          "stage": 3
+        },
+        {
+          "id": "inspect",
+          "title": "Inspect the Jeep",
+          "type": "inspect",
+          "target": "hangar-jeep",
+          "stage": 4
+        },
+        {
+          "id": "board",
+          "title": "Enter the Jeep",
+          "type": "enter",
+          "target": "hangar-jeep",
+          "stage": 5
+        },
+        {
+          "id": "drive",
+          "title": "Operate the Jeep",
+          "type": "operate",
+          "target": "hangar-jeep",
+          "stage": 6,
+          "distance_m": 12
+        }
+      ],
+      "hints": [
+        "The maintenance hangar may contain useful equipment.",
+        "Check the surrounding service buildings.",
+        "Ground support vehicles were likely stored near aircraft maintenance facilities."
+      ],
+      "journal": {
+        "initial": "The airport is closer than I thought. Several buildings are still standing. If this was a maintenance facility, there may be equipment I can use. I need to find a way to move TC167. Walking back and forth isn't going to accomplish much.",
+        "complete": "I found an old utility vehicle in one of the service buildings. Somehow, it still works. At least now I have a way to move equipment around the airbase. Next, I need something capable of carrying TC167.",
+        "hangar": "The hangar is still standing. There's enough room here to work on TC167, assuming I can find a way to get her inside. There must have been ground support equipment somewhere around this airbase.",
+        "discover": "A utility vehicle. I wasn't expecting to find one intact. Now the question is whether it still works.",
+        "inspect": "It appears to be in better condition than most of the equipment I've seen. I might actually be able to get this thing moving."
+      }
+    },
+    {
+      "id": "Q002",
+      "title": "The Means of Recovery",
+      "description": "Find equipment capable of recovering TC167.",
+      "owner": "pilot_01",
+      "classification": "main",
+      "prerequisites": [
+        "Q001"
+      ],
+      "activation": "recovery_content_available",
+      "objectives": [
+        {
+          "id": "find_equipment",
+          "title": "Locate recovery equipment",
+          "type": "discover",
+          "target": "service_garage"
+        }
+      ]
+    }
+  ]
+}

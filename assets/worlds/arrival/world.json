@@ -1,0 +1,385 @@
+{
+  "schema_version": 1,
+  "world_id": "arrival",
+  "coordinates": {
+    "up": "Y",
+    "units": "meters",
+    "rotation": "XYZ_DEGREES",
+    "forward": "+Z"
+  },
+  "assets": {
+    "tc167": {
+      "type": "aircraft",
+      "path": "assets/models/vehicles/tc167_authoring.glb"
+    },
+    "pilot": {
+      "type": "character",
+      "path": "assets/models/characters/pilot.glb"
+    },
+    "female_pilot": {
+      "type": "character",
+      "path": "assets/models/characters/female_pilot.glb"
+    },
+    "jeep": {
+      "type": "ground_vehicle",
+      "path": "assets/models/vehicles/jeep.glb"
+    },
+    "hangar": {
+      "type": "structure",
+      "path": "assets/models/environment/hangar.glb"
+    },
+    "repair_station": {
+      "type": "prop",
+      "path": "assets/models/environment/repair_station.glb"
+    }
+  },
+  "entities": [
+    {
+      "id": "hangar_01",
+      "asset": "hangar",
+      "transform": {
+        "position": [
+          300,
+          0,
+          4360
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "service_garage",
+      "asset": "hangar",
+      "transform": {
+        "position": [
+          83.77,
+          0,
+          4754.158
+        ],
+        "scale": [
+          0.25,
+          0.24,
+          0.24
+        ],
+        "rotation": [
+          0,
+          90,
+          0
+        ]
+      }
+    },
+    {
+      "id": "tc167",
+      "asset": "tc167",
+      "initial_state": {
+        "configuration": "FIGHTER",
+        "environment": "ATMOSPHERE",
+        "status": "GROUNDED"
+      },
+      "transform": {
+        "position": [
+          39.169,
+          0,
+          4854.771
+        ],
+        "rotation": [
+          0,
+          57,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pilot_01",
+      "asset": "female_pilot",
+      "transform": {
+        "position": [
+          36.537,
+          0,
+          4835.701
+        ],
+        "rotation": [
+          0,
+          35.3,
+          0
+        ]
+      }
+    },
+    {
+      "id": "hangar-jeep",
+      "asset": "jeep",
+      "initial_state": {
+        "parking_brake": true
+      },
+      "transform": {
+        "position": [
+          83.77,
+          0,
+          4750.158
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "repair_station_01",
+      "asset": "repair_station",
+      "parent": "hangar_01",
+      "anchor": "workshop"
+    },
+    {
+      "id": "service_shed",
+      "asset": "hangar",
+      "transform": {
+        "position": [
+          115.77,
+          0,
+          4799.158
+        ],
+        "scale": [
+          0.18,
+          0.2,
+          0.18
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "service_store",
+      "asset": "hangar",
+      "transform": {
+        "position": [
+          59.77,
+          0,
+          4785.158
+        ],
+        "scale": [
+          0.18,
+          0.2,
+          0.18
+        ],
+        "rotation": [
+          0,
+          180,
+          0
+        ]
+      }
+    },
+    {
+      "id": "service_workshop",
+      "asset": "hangar",
+      "transform": {
+        "position": [
+          106.77,
+          0,
+          4748.158
+        ],
+        "scale": [
+          0.18,
+          0.2,
+          0.18
+        ],
+        "rotation": [
+          0,
+          -90,
+          0
+        ]
+      }
+    },
+    {
+      "id": "hangar_b",
+      "asset": "hangar",
+      "transform": {
+        "position": [
+          300,
+          0,
+          4490
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "player": {
+    "starting_mode": "ON_FOOT",
+    "controlled_entity": "pilot_01"
+  },
+  "environment": {
+    "terrain": {
+      "directory": "hgt",
+      "registry_directory": "assets/planets/earth/tiles",
+      "planetary_seed": 205,
+      "real_blend_width": 750,
+      "prefetch_seconds": 4,
+      "cpu_cache_size": 32,
+      "cpu_cache_bytes": 33554432,
+      "latitude": 34.5,
+      "longitude": -111.5,
+      "elevation_offset": null,
+      "side": 32000,
+      "view_distance": 16000,
+      "budget": 64,
+      "max_level": 5,
+      "cells": 32,
+      "cache_size": 96,
+      "blend_width": 450,
+      "flat_clearance": 150,
+      "transition_variation": 0.15,
+      "transition_wavelength": 1800,
+      "compatibility_seed": 20,
+      "compatibility_join_width": 100,
+      "compatibility_cell_size": 50,
+      "hysteresis": 0.15
+    },
+    "town": {
+      "generator": "legacy_blocks",
+      "seed": 20
+    },
+    "airport": {
+      "runway": {
+        "center": [
+          0,
+          0,
+          3860
+        ],
+        "length": 2400,
+        "width": 45,
+        "designation": "36"
+      },
+      "taxiways": [
+        {
+          "center": [
+            65,
+            3860
+          ],
+          "size": [
+            20,
+            2400
+          ]
+        },
+        {
+          "center": [
+            50,
+            2810
+          ],
+          "size": [
+            100,
+            20
+          ]
+        },
+        {
+          "center": [
+            50,
+            3860
+          ],
+          "size": [
+            100,
+            20
+          ]
+        },
+        {
+          "center": [
+            50,
+            4910
+          ],
+          "size": [
+            100,
+            20
+          ]
+        }
+      ],
+      "apron": {
+        "center": [
+          230,
+          4360
+        ],
+        "size": [
+          250,
+          500
+        ]
+      },
+      "apron_link": {
+        "center": [
+          55,
+          4360
+        ],
+        "size": [
+          110,
+          24
+        ]
+      },
+      "primary_hangar": "hangar_01",
+      "side_hangars": [
+        {
+          "center": [
+            300,
+            12,
+            4190
+          ],
+          "size": [
+            90,
+            24,
+            110
+          ]
+        }
+      ],
+      "service_yards": [
+        {
+          "center": [
+            86.77,
+            4779.158
+          ],
+          "size": [
+            34,
+            29
+          ]
+        }
+      ],
+      "access_roads": [
+        {
+          "id": "compound_access",
+          "width": 18,
+          "points": [
+            [
+              86.77,
+              4780.158
+            ],
+            [
+              124,
+              4772
+            ],
+            [
+              182,
+              4737
+            ],
+            [
+              225,
+              4637
+            ],
+            [
+              214,
+              4572
+            ],
+            [
+              222,
+              4505
+            ]
+          ]
+        }
+      ]
+    }
+  }
+}

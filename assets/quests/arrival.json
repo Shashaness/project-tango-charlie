@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "quests": [
+    {
+      "id": "Q001",
+      "title": "Remnants of Civilization",
+      "description": "Find transportation at the outlying compound, then reach the airport.",
+      "owner": "pilot_01",
+      "classification": "main",
+      "entities": [
+        "hangar_01",
+        "hangar-jeep",
+        "tc167",
+        "service_garage",
+        "service_workshop"
+      ],
+      "objectives": [
+        {
+          "id": "compound",
+          "title": "Locate the outlying service compound",
+          "type": "reach",
+          "target": "service_garage",
+          "stage": 0
+        },
+        {
+          "id": "service",
+          "title": "Explore the service buildings",
+          "type": "reach",
+          "target": "service_garage",
+          "stage": 1
+        },
+        {
+          "id": "discover",
+          "title": "Search for ground transportation",
+          "type": "discover",
+          "target": "hangar-jeep",
+          "stage": 2
+        },
+        {
+          "id": "inspect",
+          "title": "Inspect the Jeep",
+          "type": "inspect",
+          "target": "hangar-jeep",
+          "stage": 3
+        },
+        {
+          "id": "board",
+          "title": "Board the Jeep",
+          "type": "enter",
+          "target": "hangar-jeep",
+          "stage": 4
+        },
+        {
+          "id": "drive",
+          "title": "Demonstrate powered vehicle operation",
+          "type": "operate",
+          "target": "hangar-jeep",
+          "stage": 5,
+          "distance_m": 12
+        },
+        {
+          "id": "airbase",
+          "title": "Travel to the airport",
+          "type": "reach",
+          "target": "hangar_01",
+          "stage": 6
+        },
+        {
+          "id": "hangar",
+          "title": "Enter the maintenance hangar",
+          "type": "reach",
+          "target": "hangar_01",
+          "stage": 7
+        }
+      ],
+      "hints": [
+        "Look for the outlying service buildings from the crash site.",
+        "Check covered service bays for ground transport.",
+        "Follow the paved service route toward the airport."
+      ],
+      "journal": {
+        "initial": "TC167 is in no condition to move. I should look for transportation before trying to reach the airport.",
+        "complete": "I found a working utility vehicle and reached the maintenance hangar. Next, I need equipment capable of carrying TC167.",
+        "hangar": "The hangar is still standing. There's enough room here to work on TC167, assuming I can find a way to get her inside. There must have been ground support equipment somewhere around this airbase.",
+        "discover": "A utility vehicle. I wasn't expecting to find one intact. Now the question is whether it still works.",
+        "inspect": "It appears to be in better condition than most of the equipment I've seen. I might actually be able to get this thing moving.",
+        "compound": "There are several buildings between the crash site and the airport. They look like some kind of service facility. I can't see any movement, but the structures appear to be reasonably intact. It's worth investigating before I attempt the journey to the airbase."
+      }
+    },
+    {
+      "id": "Q002",
+      "title": "The Means of Recovery",
+      "description": "Find access to the heavy recovery facility and inspect its equipment.",
+      "owner": "pilot_01",
+      "classification": "main",
+      "prerequisites": [
+        "Q001"
+      ],
+      "objectives": [
+        {
+          "id": "explore_a",
+          "title": "Explore Hangar A",
+          "type": "reach",
+          "target": "hangar_01",
+          "stage": 0
+        },
+        {
+          "id": "office",
+          "title": "Locate the maintenance office",
+          "type": "discover",
+          "target": "office_desk",
+          "stage": 1
+        },
+        {
+          "id": "desk",
+          "title": "Inspect the desk",
+          "type": "inspect",
+          "target": "office_desk",
+          "stage": 2
+        },
+        {
+          "id": "drawer",
+          "title": "Open the desk drawer",
+          "type": "open",
+          "target": "office_drawer",
+          "stage": 3
+        },
+        {
+          "id": "key_seen",
+          "title": "Discover the key",
+          "type": "discover",
+          "target": "office_key",
+          "stage": 4
+        },
+        {
+          "id": "key_taken",
+          "title": "Collect the key",
+          "type": "collect",
+          "target": "office_key",
+          "stage": 5
+        },
+        {
+          "id": "locate_b",
+          "title": "Locate Hangar B",
+          "type": "reach",
+          "target": "hangar_b",
+          "stage": 6
+        },
+        {
+          "id": "unlock",
+          "title": "Unlock the personnel door",
+          "type": "unlock",
+          "target": "personnel_door",
+          "stage": 7
+        },
+        {
+          "id": "enter_b",
+          "title": "Enter Hangar B",
+          "type": "reach",
+          "target": "hangar_b",
+          "stage": 8
+        },
+        {
+          "id": "panel",
+          "title": "Locate the gate control",
+          "type": "discover",
+          "target": "gate_control",
+          "stage": 9
+        },
+        {
+          "id": "gate",
+          "title": "Open the main gate",
+          "type": "open",
+          "target": "main_gate",
+          "stage": 10
+        },
+        {
+          "id": "jeep_inside",
+          "title": "Bring the Jeep inside",
+          "type": "reach",
+          "target": "hangar_b",
+          "stage": 11
+        },
+        {
+          "id": "crane_seen",
+          "title": "Discover the crane",
+          "type": "discover",
+          "target": "crane_station",
+          "stage": 12
+        },
+        {
+          "id": "crane_exam",
+          "title": "Inspect the crane",
+          "type": "inspect",
+          "target": "crane_station",
+          "stage": 13
+        },
+        {
+          "id": "trolley_seen",
+          "title": "Discover the recovery trolley",
+          "type": "discover",
+          "target": "trolley",
+          "stage": 14
+        },
+        {
+          "id": "trolley_exam",
+          "title": "Inspect the recovery trolley",
+          "type": "inspect",
+          "target": "trolley",
+          "stage": 15
+        },
+        {
+          "id": "restore",
+          "title": "Trolley restoration and towing await future content",
+          "type": "repair",
+          "target": "trolley",
+          "stage": 16
+        }
+      ],
+      "journal": {
+        "office": "There's an office inside the hangar. A desk, a computer, even a printer. Whoever worked here left behind the ordinary things that made up their daily lives. I wonder if they knew they would never return.",
+        "key_taken": "I found a key inside one of the desk drawers. I should see what it opens.",
+        "trolley_exam": "This is what I was hoping to find. Heavy lifting equipment, recovery machinery, and enough space to work on something the size of TC167. If I can get these systems operational, I might actually have a chance."
+      },
+      "hints": [
+        "Look for the administrative workspace inside the maintenance hangar.",
+        "Check the desk and nearby fixtures.",
+        "Use the personnel entrance before trying to bring in the Jeep."
+      ]
+    }
+  ]
+}

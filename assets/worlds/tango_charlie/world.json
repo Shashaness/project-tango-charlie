@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "world_id": "tango_charlie",
+  "coordinates": {"up": "Y", "units": "meters", "rotation": "XYZ_DEGREES", "forward": "+Z"},
+  "assets": {
+    "tc167": {"type": "aircraft", "path": "assets/models/vehicles/tc167_authoring.glb"},
+    "pilot": {"type": "character", "path": "assets/models/characters/pilot.glb"},
+    "female_pilot": {"type": "character", "path": "assets/models/characters/female_pilot.glb"},
+    "jeep": {"type": "ground_vehicle", "path": "assets/models/vehicles/jeep.glb"},
+    "hangar": {"type": "structure", "path": "assets/models/environment/hangar.glb"},
+    "repair_station": {"type": "prop", "path": "assets/models/environment/repair_station.glb"}
+  },
+  "entities": [
+    {"id": "hangar_01", "asset": "hangar", "transform": {"position": [300, 0, 3000]}},
+    {"id": "tc167", "asset": "tc167", "parent": "hangar_01", "anchor": "aircraft_parking",
+     "initial_state": {"configuration": "FIGHTER", "environment": "ATMOSPHERE", "status": "GROUNDED"}},
+    {"id": "pilot_01", "asset": "female_pilot", "parent": "hangar_01", "anchor": "pilot_spawn"},
+    {"id": "hangar-jeep", "asset": "jeep", "parent": "hangar_01", "anchor": "vehicle_parking",
+     "initial_state": {"parking_brake": true}},
+    {"id": "repair_station_01", "asset": "repair_station", "parent": "hangar_01", "anchor": "workshop"}
+  ],
+  "player": {"starting_mode": "AIRCRAFT", "controlled_entity": "tc167"},
+  "environment": {
+    "terrain": {
+      "directory": "hgt", "registry_directory": "assets/planets/earth/tiles",
+      "planetary_seed": 205, "real_blend_width": 750, "prefetch_seconds": 4,
+      "cpu_cache_size": 32, "cpu_cache_bytes": 33554432,
+      "latitude": 34.5, "longitude": -111.5, "elevation_offset": null,
+      "side": 32000, "view_distance": 16000, "budget": 64, "max_level": 5,
+      "cells": 32, "cache_size": 96, "blend_width": 450, "flat_clearance": 150,
+      "transition_variation": 0.15, "transition_wavelength": 1800,
+      "compatibility_seed": 20, "compatibility_join_width": 100,
+      "compatibility_cell_size": 50, "hysteresis": 0.15
+    },
+    "town": {"generator": "legacy_blocks", "seed": 20},
+    "airport": {
+      "runway": {"center": [0, 0, 2500], "length": 2400, "width": 45, "designation": "36"},
+      "taxiways": [
+        {"center": [100, 2500], "size": [20, 2400]},
+        {"center": [50, 1450], "size": [100, 20]},
+        {"center": [50, 2500], "size": [100, 20]},
+        {"center": [50, 3550], "size": [100, 20]}
+      ],
+      "apron": {"center": [230, 3000], "size": [250, 500]},
+      "apron_link": {"center": [55, 3000], "size": [110, 24]},
+      "primary_hangar": "hangar_01",
+      "side_hangars": [
+        {"center": [300, 12, 2830], "size": [90, 24, 110]},
+        {"center": [300, 12, 3170], "size": [90, 24, 110]}
+      ]
+    }
+  }
+}

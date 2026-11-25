@@ -5,11 +5,11 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
+from game.access_road import AccessRoad
 from game.atmospheric_physics import PARAMETERS
+from game.urban_layout import CITY_CENTER as CITY_CENTER
+from game.urban_layout import CITY_SIZE as CITY_SIZE
 from game.urban_layout import (
-    CITY_CENTER,
-    CITY_SIZE,
-    SEED,
     center_size,
     downtown_distance,
     generate_layout,
@@ -17,15 +17,17 @@ from game.urban_layout import (
     inset,
     subtract_rectangle,
 )
+from game.world_loader import STATIC_KINDS, default_scene, environment_geometry
+from game.world_manifest import default_definition, require
 
 
 @dataclass(frozen=True)
 class Runway:
     """Runway center/extent geometry in local meters with orientation-aware containment."""
 
-    center: tuple = (0.0, 0.0, 2500.0)
-    length: float = 2400.0
-    width: float = 45.0
+    center: tuple
+    length: float
+    width: float
     forward: tuple = (0.0, 0.0, -1.0)
     designation: str = "36"
 
@@ -62,9 +64,16 @@ class Runway:
         return (np.abs(lateral) <= self.width / 2) & (np.abs(longitudinal) <= self.length / 2)
 
 
-RUNWAY = Runway()
-HANGAR_SPAWN = (310.0, 0.0, 3000.0)
-HANGAR_FORWARD = (-1.0, 0.0, 0.0)
+def __getattr__(name):
+    """Resolve the legacy default-world references when a caller asks for them."""
+    if name == "RUNWAY":
+        return Runway(**default_definition().airport["runway"])
+    if name in {"HANGAR_SPAWN", "HANGAR_FORWARD"}:
+        aircraft = default_scene().of_kind("aircraft")[0]
+        return aircraft.position if name == "HANGAR_SPAWN" else aircraft.forward
+    raise AttributeError(name)
+
+
 GROUND_ELEVATION = PARAMETERS.ground_altitude
 TERRAIN_BOUNDS = (
     -9000.0,
@@ -169,13 +178,17 @@ def building_height(x, z, rng):
 class WorldEnvironment:
     """Generate deterministic urban/airfield scenery, protected footprints, and obstacle boxes."""
 
-    def __init__(self, seed=SEED):
+    def __init__(self, seed=None, scene=None):
         """Generate seeded city/airport scenery and build protected infrastructure footprints.
 
         Args:
             seed: Integer seed for deterministic variation.
         """
-        self.runway = RUNWAY
+        scene = scene or default_scene()
+        airport = scene.definition.airport
+        seed = scene.definition.town_seed if seed is None else seed
+        self.runway = Runway(**airport["runway"])
+        self.walkable_floors = []
         self.blocks = []
         self.buildings = []
         self.solid_boxes = []
@@ -285,13 +298,18 @@ class WorldEnvironment:
         r = self.runway
         rx, _, rz = r.center
         self.surface((rx, rz), (r.width, r.length), "runway")
-        self.surface((100, 2500), (20, 2400), "taxiway")
-        for z in (1450, 2500, 3550):
-            self.surface((50, z), (100, 20), "taxiway")
+        for center, size in airport["taxiways"]:
+            self.surface(center, size, "taxiway")
         # Reapply pavement at taxiway junctions before cutting the markings into it.
         self.surface((rx, rz), (r.width, r.length), "runway")
-        self.surface((230, 3000), (250, 500), "apron")
-        self.surface((55, 3000), (110, 24), "taxiway")
+        self.surface(*airport["apron"], "apron")
+        self.surface(*airport["apron_link"], "taxiway")
+        for center, size in airport["service_yards"]:
+            self.surface(center, size, "apron")
+        self.access_roads = tuple(
+            AccessRoad(key, width, controls)
+            for key, (width, controls) in airport["access_roads"].items()
+        )
         for z in np.arange(rz - r.length / 2 + 150, rz + r.length / 2 - 149, 60):
             self.surface((rx, z), (1.2, 30), "marking")
         for z in (rz - r.length / 2 + 30, rz + r.length / 2 - 30):
@@ -299,31 +317,43 @@ class WorldEnvironment:
                 self.surface((rx + x, z), (3, 40), "marking")
         self.number(r.designation, rx, rz + r.length / 2 - 95)
         self.number("18", rx, rz - r.length / 2 + 95, reverse=True)
-        for z in (2830, 3170):
-            self.box(
-                (300, GROUND_ELEVATION + 12, z),
-                (90, 24, 110),
-                BUILDING_PALETTE[1],
-                region="airport",
-            )
-        # Middle hangar opens west onto the apron; no invisible front collision box.
-        for center, size in (
-            ((344, 12, 3000), (2, 24, 110)),
-            ((300, 12, 2946), (88, 24, 2)),
-            ((300, 12, 3054), (88, 24, 2)),
-            ((300, 23.5, 3000), (90, 1, 110)),
-        ):
-            self.box(center, size, BUILDING_PALETTE[1], region="airport", bottom=size[1] == 1)
+        for center, size in airport["side_hangars"]:
+            self.box(center, size, BUILDING_PALETTE[1], region="airport")
+        for placement in scene.of_kind(*STATIC_KINDS):
+            vertices, surfaces, obstacles = environment_geometry(placement)
+            if placement.identity == airport["primary_hangar"]:
+                require(
+                    any(kind == "apron" for _, _, kind in surfaces),
+                    f"{placement.identity}: primary hangar needs Surface.Floor",
+                )
+            self.vertices.extend(vertices)
+            for center, size, kind in sorted(surfaces, key=lambda item: item[2]):
+                self.surface(center, size, kind)
+                if kind == "apron":
+                    self.walkable_floors.append(self.ground_surfaces[-1].bounds)
+            for center, size in obstacles:
+                self.solid_boxes.append((center, size))
+                x, _, z = center
+                w, _, d = size
+                self.infrastructure_footprints["airport"].append(
+                    (x - w / 2, x + w / 2, z - d / 2, z + d / 2)
+                )
         self.box(
-            (180, GROUND_ELEVATION + 18, 2700), (14, 36, 14), BUILDING_PALETTE[0], region="airport"
+            (rx + 180, GROUND_ELEVATION + 18, rz + 200),
+            (14, 36, 14),
+            BUILDING_PALETTE[0],
+            region="airport",
         )
         self.box(
-            (180, GROUND_ELEVATION + 39, 2700), (28, 8, 28), BUILDING_PALETTE[5], region="airport"
+            (rx + 180, GROUND_ELEVATION + 39, rz + 200),
+            (28, 8, 28),
+            BUILDING_PALETTE[5],
+            region="airport",
         )
         for x in (-70, 390):
-            self.surface((x, 2500), (12, 2600), "perimeter")
-        for z in (1200, 3800):
-            self.surface((160, z), (460, 12), "perimeter")
+            self.surface((rx + x, rz), (12, 2600), "perimeter")
+        for z in (-1300, 1300):
+            self.surface((rx + 160, rz + z), (460, 12), "perimeter")
 
         # Derive separate envelopes from actual emitted infrastructure, including
         # airport structures. Keep ground only within their compact union.
@@ -383,6 +413,16 @@ class WorldEnvironment:
         self.vertices = np.asarray(self.vertices, dtype=np.float32)
         self.vertices.setflags(write=False)
         self.ground_surfaces = tuple(self.ground_surfaces)
+
+    def attach_access_roads(self, ground):
+        if self.access_roads:
+            pavement = [
+                row
+                for road in self.access_roads
+                for row in road.vertices(ground.height, GROUND_PALETTE["apron"])
+            ]
+            self.vertices = np.concatenate((self.vertices, np.asarray(pavement, dtype=np.float32)))
+            self.vertices.setflags(write=False)
 
     def render_building(self, building, rng):
         """Append building geometry, facade details, and optional roof features.

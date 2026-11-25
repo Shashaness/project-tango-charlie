@@ -51,3 +51,17 @@ venv/
 .env
 .env.*
 secrets/
+
+# Local campaign state
+/saves/
+
+# Local survey markers
+/surveys/
+
+# Local authoring sources, working copies, and generated reports
+/assets/source/
+*.blend[0-9]*
+/assets/blender/**/* copy.blend
+/assets/blender/TC167_Last_Report.json
+/assets/models/vehicles/tc167_authoring_old.glb
+/female_pilot.blend

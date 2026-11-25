@@ -6,19 +6,34 @@ from OpenGL import GL
 from engine.asset_paths import asset_path
 from engine.gltf_loader import load_glb
 from engine.hud import HUD
-from engine.mesh import Mesh
+from engine.jeep_asset import JeepVisual
+from engine.mesh import Mesh, upload_base_color
 from engine.model import ModelResources
+from engine.pilot_asset import PilotAsset
 from engine.shader import Shader
 from game.countermeasure import CountermeasureType
 from game.flight_state import Environment, VehicleMode
 from game.missile import MotorState
+from game.player_control import UP, ControlMode
 from game.prototype_model import PROTOTYPE_PATH
 
 
 class Renderer:
     """Own scene GPU resources and draw vehicle, terrain, combat, and HUD observations."""
 
-    def __init__(self, world, vehicle, camera, fcc=None, combat=None):
+    def __init__(
+        self,
+        world,
+        vehicle,
+        camera,
+        fcc=None,
+        combat=None,
+        *,
+        campaign_hud=None,
+        object_scene=None,
+        navigation=None,
+        information=None,
+    ):
         """Retain scene observers and initialize empty GPU resource handles.
 
         Args:
@@ -32,6 +47,13 @@ class Renderer:
         self.fighter_resources = None
         self.fighter_model = None
         self.combat = combat
+        self.campaign_hud = campaign_hud
+        self.navigation = navigation
+        self.information = information
+        self.object_scene = object_scene
+        self.object_mesh = None
+        self.object_models = {}
+        self.object_revision = -1
         self.missile_mesh = None
         self.target_mesh = None
         self.enemy_mesh = None
@@ -50,6 +72,13 @@ class Renderer:
         self.vehicle_axes = None
         self.show_axes = False
         self.environment_mesh = None
+        self.pilot_meshes = []
+        self.character_shader = None
+        self.jeep_models = {}
+        self.pilot_asset = None
+        self._observed_pilot = None
+        self._pilot_revision = -1
+        self._pilot_time = 0.0
         self.terrain_resources = None
         self.grid = None
         self.drawable = True
@@ -94,6 +123,9 @@ class Renderer:
             transformation.model if transformation is not None else load_glb(PROTOTYPE_PATH)
         )
         self.fighter_resources = ModelResources(self.fighter_model)
+        for path in dict.fromkeys(getattr(self.world, "ground_vehicle_assets", {}).values()):
+            visual = JeepVisual(path)
+            self.jeep_models[path] = visual, ModelResources(visual.model)
         test = getattr(self.world, "model_test", None)
         if test is not None:
             self.model_resources = ModelResources(test.model)
@@ -353,6 +385,12 @@ class Renderer:
             self.shader.set_matrix("model", model)
             self.mesh.draw()
         self.shader.set_matrix("model", np.eye(4, dtype=np.float32))
+        control = getattr(self.world, "player_control", None)
+        on_foot = control is not None and control.mode is ControlMode.ON_FOOT
+        driving = control is not None and control.mode is ControlMode.GROUND_VEHICLE
+        terrain_observer = (
+            control.pilot if on_foot else control.active.vehicle if driving else self.vehicle
+        )
         self.hud.terrain_debug = None
         geographic = self.vehicle.geographic_position
         self.hud.geographic_mapped = (
@@ -365,8 +403,8 @@ class Renderer:
                 self.terrain_resources.update(
                     self.camera.position,
                     self.camera.projection_matrix() @ self.camera.view_matrix(),
-                    self.vehicle.position,
-                    self.vehicle.velocity,
+                    terrain_observer.position,
+                    terrain_observer.velocity,
                 )
                 self.terrain_resources.draw(self.shader, self.camera)
                 self.hud.terrain_debug = self.terrain_resources.stats
@@ -376,7 +414,10 @@ class Renderer:
                 )
         else:
             self.grid.draw()
-        if self.camera.mode == "CHASE":
+        if atmosphere:
+            self._draw_ground_vehicles()
+            self._draw_interactive_objects()
+        if self.camera.mode == "CHASE" or on_foot or driving:
             self.shader.set_matrix("model", self.vehicle.model_matrix())
             if (
                 getattr(self.vehicle, "transformation", None) is not None
@@ -398,7 +439,7 @@ class Renderer:
                 self.vehicle_mesh.draw()
                 if self.vehicle.flight_state.mode is VehicleMode.VTOL:
                     self.vtol_mesh.draw()
-            if self.show_axes:
+            if self.show_axes and not (on_foot or driving):
                 if (
                     self.vehicle.flight_state.environment is Environment.ATMOSPHERE
                     or self.vehicle.flight_state.mode is VehicleMode.VTOL
@@ -412,9 +453,162 @@ class Renderer:
                 test.model, self.shader, self.vehicle.model_matrix() @ test.root
             )
         self._draw_combat_scene()
-        self.hud.render(
-            self.vehicle, self.camera, self.shader, self.fcc, self.show_axes, self.combat
+        if on_foot:
+            self._draw_pilot(control.pilot, visible=not self.camera.first_person)
+        elif driving:
+            self._draw_driver(control.active.vehicle)
+        else:
+            self.hud.render(
+                self.vehicle, self.camera, self.shader, self.fcc, self.show_axes, self.combat
+            )
+        fix, notice = self.navigation() if self.navigation else (None, "")
+        inset = 0
+        if fix is not None:
+            inset = self.hud.render_navigation(self.shader, fix, notice)
+        if (on_foot or driving) and self.information is not None:
+            self.hud.render_helmet_information(self.shader, *self.information())
+            return
+        if control is not None:
+            self.hud.render_control_prompt(self.shader, control.prompt(), row_offset=inset)
+        if self.campaign_hud is not None:
+            for row, line in enumerate(self.campaign_hud(), start=inset + 1):
+                self.hud.render_control_prompt(self.shader, line, row_offset=row)
+
+    def _draw_interactive_objects(self):
+        scene = self.object_scene
+        if scene is None:
+            return
+        if self.object_revision != scene.revision:
+            corners = np.array(
+                (
+                    (0, 0, 0),
+                    (1, 0, 0),
+                    (1, 1, 0),
+                    (0, 1, 0),
+                    (0, 0, 1),
+                    (1, 0, 1),
+                    (1, 1, 1),
+                    (0, 1, 1),
+                )
+            )
+            faces = (
+                (0, 3, 2, 1),
+                (4, 5, 6, 7),
+                (0, 1, 5, 4),
+                (3, 7, 6, 2),
+                (0, 4, 7, 3),
+                (1, 2, 6, 5),
+            )
+            vertices = []
+            for lower, upper, rgb in scene.render_rows():
+                points = lower + corners * (upper - lower)
+                for face, shade in zip(faces, (0.78, 0.87, 0.60, 1.0, 0.73, 0.91), strict=True):
+                    color = np.asarray(rgb) * shade
+                    vertices.extend((*points[face[index]], *color) for index in (0, 1, 2, 0, 2, 3))
+            if vertices:
+                if self.object_mesh is None:
+                    self.object_mesh = Mesh(vertices)
+                else:
+                    self.object_mesh.update_vertices(vertices)
+            elif self.object_mesh is not None:
+                self.object_mesh.close()
+                self.object_mesh = None
+            self.object_revision = scene.revision
+        if self.object_mesh is not None:
+            self.shader.set_matrix("model", np.eye(4, dtype=np.float32))
+            self.object_mesh.draw()
+        for path, position in scene.visual_rows():
+            if path not in self.object_models:
+                from game.world_loader import scene_model
+
+                model = scene_model(path)
+                self.object_models[path] = model, ModelResources(model)
+            model, resources = self.object_models[path]
+            placement = np.eye(4)
+            placement[:3, 3] = position
+            resources.draw(model, self.shader, placement)
+
+    def _draw_ground_vehicles(self):
+        if not self.jeep_models:
+            return
+        for vehicle in getattr(self.world, "ground_vehicles", ()):
+            path = self.world.ground_vehicle_assets[vehicle.identity]
+            visual, resources = self.jeep_models[path]
+            images = getattr(visual.model, "base_color_textures", ())
+            textured_shader = self._base_color_shader() if images else None
+            resources.draw(
+                visual.model, self.shader, visual.pose(vehicle), textured_shader=textured_shader
+            )
+
+    def _base_color_shader(self):
+        if self.character_shader is None:
+            shaders = asset_path("shaders")
+            self.character_shader = Shader(shaders / "basic.vert", shaders / "character.frag")
+        shader = self.character_shader
+        shader.use()
+        shader.set_matrix("view", self.camera.view_matrix())
+        shader.set_matrix("projection", self.camera.projection_matrix())
+        self.shader.use()
+        return shader
+
+    def _load_pilot(self):
+        if self.pilot_asset is None:
+            self.pilot_asset = PilotAsset(self.world.pilot_spawn.definition.asset.path)
+
+    def _draw_driver(self, vehicle):
+        self._load_pilot()
+        hips = self.pilot_asset.seat_hips
+        placement = vehicle.model_matrix()
+        placement[:3, 3] = vehicle.anchor("DriverSeat") + placement[:3, :3] @ (
+            self.pilot_asset.seat_offset - hips
         )
+        self._draw_pilot_mesh(placement, seated=True)
+
+    def _draw_pilot(self, pilot, visible=True):
+        self._load_pilot()
+        if self._observed_pilot is not pilot or self._pilot_revision != pilot.pose_revision:
+            self._observed_pilot = pilot
+            self._pilot_revision = pilot.pose_revision
+            self.pilot_asset.reset_locomotion()
+            self._pilot_time = pilot.elapsed
+        self.pilot_asset.update(pilot.clip, pilot.elapsed - self._pilot_time)
+        self._pilot_time = pilot.elapsed
+        if not visible:
+            return
+        placement = np.eye(4)
+        placement[:3, :3] = np.column_stack((np.cross(UP, pilot.forward), UP, pilot.forward))
+        placement[:3, 3] = pilot.position
+        self._draw_pilot_mesh(placement)
+
+    def _draw_pilot_mesh(self, placement, seated=False):
+        parts = list(self.pilot_asset.vertices(seated=seated))
+        if not self.pilot_meshes:
+            for (vertices, indices), (pixels, _) in zip(
+                parts, self.pilot_asset.base_colors, strict=True
+            ):
+                mesh = Mesh(vertices, indices)
+                self.pilot_meshes.append((mesh, 0))
+                if pixels is not None:
+                    self.pilot_meshes[-1] = mesh, upload_base_color(pixels)
+        textured_shader = (
+            self._base_color_shader() if any(t for _, t in self.pilot_meshes) else None
+        )
+        for (values, _), (mesh, texture), (_, factor) in zip(
+            parts, self.pilot_meshes, self.pilot_asset.base_colors, strict=True
+        ):
+            mesh.update_vertices(values)
+            shader = self.shader
+            if texture:
+                shader = textured_shader
+                shader.use()
+                GL.glActiveTexture(GL.GL_TEXTURE0)
+                GL.glBindTexture(GL.GL_TEXTURE_2D, texture)
+                GL.glUniform3f(GL.glGetUniformLocation(shader.program, "baseFactor"), *factor)
+            shader.set_matrix("model", placement)
+            mesh.draw()
+            if texture:
+                GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+                self.shader.use()
 
     def _draw_combat_scene(self):
         """Draw targets, projectiles, missiles, and decoys from their simulation poses."""
@@ -591,7 +785,24 @@ class Renderer:
         if self.fighter_resources is not None:
             self.fighter_resources.close()
             self.fighter_resources = None
+        for _, resources in self.jeep_models.values():
+            resources.close()
+        self.jeep_models.clear()
         self.hud.close()
+        if self.object_mesh is not None:
+            self.object_mesh.close()
+            self.object_mesh = None
+        for _, resources in self.object_models.values():
+            resources.close()
+        self.object_models.clear()
+        for mesh, texture in self.pilot_meshes:
+            mesh.close()
+            if texture:
+                GL.glDeleteTextures([texture])
+        self.pilot_meshes.clear()
+        if self.character_shader is not None:
+            self.character_shader.close()
+            self.character_shader = None
         for resource in (
             "environment_mesh",
             "battledroid_mesh",

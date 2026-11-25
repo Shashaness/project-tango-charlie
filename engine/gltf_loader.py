@@ -131,7 +131,7 @@ class Accessors:
         if component not in components:
             raise AssetError(f"accessor {index}: unsupported componentType {component}.")
         dtype = types[component]
-        width = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}[expected]
+        width = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4, "MAT4": 16}[expected]
         count = integer(a.get("count"), f"accessor {index}.count", 1)
         view = item(self.document.get("bufferViews", []), a.get("bufferView"), "bufferView")
         if view.get("buffer") != 0:
@@ -209,6 +209,47 @@ def reject_features(document):
     for a in document.get("accessors", []):
         if "sparse" in a:
             raise AssetError("Unsupported sparse accessor.")
+
+
+def decode_base_colors(document, binary, rigid):
+    """Decode embedded base colors and validate the PBR resources carried by the GLB."""
+    from io import BytesIO
+
+    decoded = {}
+
+    def image(info):
+        from PIL import Image
+
+        if info.get("texCoord", 0) != 0:
+            raise AssetError("Textured materials require TEXCOORD_0.")
+        texture = item(document.get("textures", []), info.get("index"), "texture")
+        index = texture.get("source")
+        source = item(document.get("images", []), index, "image")
+        if index not in decoded:
+            if "uri" in source or source.get("mimeType") not in {"image/png", "image/jpeg"}:
+                raise AssetError("Textures must be embedded PNG or JPEG images.")
+            view = item(document.get("bufferViews", []), source.get("bufferView"), "image view")
+            offset, size = view.get("byteOffset", 0), view["byteLength"]
+            if view["buffer"] != 0 or offset < 0 or size <= 0 or offset + size > len(binary):
+                raise AssetError("Character image buffer view is out of bounds.")
+            try:
+                with Image.open(BytesIO(binary[offset : offset + size])) as pixels:
+                    decoded[index] = np.asarray(pixels.convert("RGBA"))
+            except (OSError, Image.DecompressionBombError) as error:
+                raise AssetError("Invalid embedded texture.") from error
+        return decoded[index]
+
+    result = []
+    for material in rigid.get("materials", []):
+        pbr = material.get("pbrMetallicRoughness", {})
+        base = pbr.pop("baseColorTexture", None)
+        for properties, key in ((pbr, "metallicRoughnessTexture"), (material, "normalTexture")):
+            if key in properties:
+                image(properties.pop(key))
+        result.append(image(base) if base is not None else None)
+    for key in ("textures", "images", "samplers"):
+        rigid.pop(key, None)
+    return result
 
 
 def material(value):
@@ -409,7 +450,10 @@ def build_model(document, binary, scale=1.0, convert_coordinates=True):
             )
             base = trs(*base_trs)
         refs = item(mesh_map, n["mesh"], "mesh") if "mesh" in n else ()
-        nodes.append(ModelNode(n.get("name", f"Node{index}"), base, refs, base_trs))
+        node = ModelNode(n.get("name", f"Node{index}"), base, refs, base_trs)
+        if isinstance(n.get("extras"), dict):
+            node.extras = n["extras"]
+        nodes.append(node)
     for index, n in enumerate(source_nodes):
         for child_index in n.get("children", []):
             child = item(nodes, child_index, "child node")

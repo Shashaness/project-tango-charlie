@@ -1,0 +1,658 @@
+{
+  "schema_version": 1,
+  "objects": {
+    "facade_south": {
+      "type": "scenery",
+      "position": [
+        255,
+        6,
+        3089
+      ],
+      "size": [
+        0.55,
+        12,
+        28
+      ],
+      "color": [
+        0.34,
+        0.36,
+        0.37
+      ],
+      "solid": true
+    },
+    "facade_middle": {
+      "type": "scenery",
+      "position": [
+        255,
+        6,
+        3140.5
+      ],
+      "size": [
+        0.55,
+        12,
+        27
+      ],
+      "color": [
+        0.34,
+        0.36,
+        0.37
+      ],
+      "solid": true
+    },
+    "facade_north": {
+      "type": "scenery",
+      "position": [
+        255,
+        6,
+        3170.5
+      ],
+      "size": [
+        0.55,
+        12,
+        29
+      ],
+      "color": [
+        0.34,
+        0.36,
+        0.37
+      ],
+      "solid": true
+    },
+    "facade_header": {
+      "type": "scenery",
+      "position": [
+        255,
+        17,
+        3130
+      ],
+      "size": [
+        0.55,
+        14,
+        110
+      ],
+      "color": [
+        0.34,
+        0.36,
+        0.37
+      ],
+      "solid": true
+    },
+    "gate_upper": {
+      "type": "scenery",
+      "position": [
+        255,
+        9.55,
+        3115
+      ],
+      "size": [
+        0.55,
+        0.9,
+        24
+      ],
+      "color": [
+        0.34,
+        0.36,
+        0.37
+      ],
+      "solid": true
+    },
+    "door_upper": {
+      "type": "scenery",
+      "position": [
+        255,
+        7.5,
+        3155
+      ],
+      "size": [
+        0.55,
+        9,
+        2
+      ],
+      "color": [
+        0.34,
+        0.36,
+        0.37
+      ],
+      "solid": true
+    },
+    "personnel_door": {
+      "type": "door",
+      "position": [
+        255,
+        1.5,
+        3155
+      ],
+      "size": [
+        0.45,
+        3,
+        2
+      ],
+      "color": [
+        0.28,
+        0.37,
+        0.4
+      ],
+      "name": "PERSONNEL DOOR",
+      "solid": true,
+      "travel": [
+        0,
+        3.15,
+        0
+      ],
+      "duration": 1.2,
+      "key": "office_key",
+      "anchor": [
+        -0.35,
+        0,
+        0
+      ]
+    },
+    "main_gate": {
+      "type": "gate",
+      "position": [
+        255,
+        4.55,
+        3115
+      ],
+      "size": [
+        0.45,
+        9.1,
+        24
+      ],
+      "color": [
+        0.23,
+        0.31,
+        0.33
+      ],
+      "solid": true,
+      "travel": [
+        0,
+        9.2,
+        0
+      ],
+      "duration": 4
+    },
+    "gate_control": {
+      "type": "panel",
+      "position": [
+        261,
+        1.2,
+        3157
+      ],
+      "size": [
+        0.35,
+        0.38,
+        0.36
+      ],
+      "color": [
+        0.75,
+        0.48,
+        0.13
+      ],
+      "name": "GATE CONTROL",
+      "control": "main_gate",
+      "reach": 1.8
+    },
+    "office_desk": {
+      "type": "furniture",
+      "position": [
+        307,
+        1.02,
+        3020
+      ],
+      "size": [
+        1.45,
+        0.16,
+        3.2
+      ],
+      "color": [
+        0.39,
+        0.27,
+        0.17
+      ],
+      "name": "OFFICE DESK",
+      "solid": true,
+      "description": "A MAINTENANCE DESK WITH A DRAWER.",
+      "priority_offset": 0.7
+    },
+    "desk_leg_3018.55": {
+      "type": "scenery",
+      "position": [
+        307,
+        0.48,
+        3018.55
+      ],
+      "size": [
+        1.2,
+        0.96,
+        0.18
+      ],
+      "color": [
+        0.27,
+        0.22,
+        0.18
+      ],
+      "solid": true
+    },
+    "desk_leg_3021.45": {
+      "type": "scenery",
+      "position": [
+        307,
+        0.48,
+        3021.45
+      ],
+      "size": [
+        1.2,
+        0.96,
+        0.18
+      ],
+      "color": [
+        0.27,
+        0.22,
+        0.18
+      ],
+      "solid": true
+    },
+    "office_drawer": {
+      "type": "drawer",
+      "position": [
+        306.47,
+        0.83,
+        3020
+      ],
+      "size": [
+        0.9,
+        0.18,
+        1.3
+      ],
+      "color": [
+        0.49,
+        0.36,
+        0.22
+      ],
+      "name": "DESK DRAWER",
+      "travel": [
+        -1.03,
+        0,
+        0
+      ],
+      "duration": 0.55,
+      "reach": 2,
+      "solid": true,
+      "block_opening": true
+    },
+    "office_key": {
+      "type": "key",
+      "position": [
+        306.47,
+        0.951,
+        3020
+      ],
+      "size": [
+        0.17,
+        0.035,
+        0.095
+      ],
+      "color": [
+        0.95,
+        0.73,
+        0.21
+      ],
+      "name": "KEY",
+      "container": "office_drawer",
+      "description": "A PHYSICAL KEY.",
+      "priority_offset": -0.5
+    },
+    "computer": {
+      "type": "equipment",
+      "position": [
+        307.12,
+        1.43,
+        3019.42
+      ],
+      "size": [
+        0.44,
+        0.65,
+        0.8
+      ],
+      "color": [
+        0.16,
+        0.19,
+        0.21
+      ],
+      "name": "COMPUTER",
+      "description": "THE SCREEN IS DARK."
+    },
+    "printer": {
+      "type": "equipment",
+      "position": [
+        307.12,
+        1.24,
+        3021.02
+      ],
+      "size": [
+        0.58,
+        0.25,
+        0.65
+      ],
+      "color": [
+        0.54,
+        0.54,
+        0.5
+      ],
+      "name": "PRINTER",
+      "description": "THE PRINTER IS IDLE."
+    },
+    "office_partition": {
+      "type": "scenery",
+      "position": [
+        309,
+        1.5,
+        3020
+      ],
+      "size": [
+        0.25,
+        3,
+        8
+      ],
+      "color": [
+        0.42,
+        0.46,
+        0.47
+      ],
+      "solid": true
+    },
+    "office_sign": {
+      "type": "scenery",
+      "position": [
+        308.8,
+        2.2,
+        3020
+      ],
+      "size": [
+        0.15,
+        0.65,
+        2
+      ],
+      "color": [
+        0.4,
+        0.61,
+        0.63
+      ]
+    },
+    "crane_support_3107": {
+      "type": "scenery",
+      "position": [
+        324,
+        5,
+        3107
+      ],
+      "size": [
+        1.4,
+        10,
+        1.4
+      ],
+      "color": [
+        0.65,
+        0.47,
+        0.16
+      ],
+      "solid": true
+    },
+    "crane_support_3137": {
+      "type": "scenery",
+      "position": [
+        324,
+        5,
+        3137
+      ],
+      "size": [
+        1.4,
+        10,
+        1.4
+      ],
+      "color": [
+        0.65,
+        0.47,
+        0.16
+      ],
+      "solid": true
+    },
+    "crane": {
+      "type": "equipment",
+      "position": [
+        324,
+        10,
+        3122
+      ],
+      "size": [
+        1.65,
+        1.4,
+        32
+      ],
+      "color": [
+        0.65,
+        0.47,
+        0.16
+      ]
+    },
+    "crane_station": {
+      "type": "panel",
+      "position": [
+        318,
+        1.1,
+        3122
+      ],
+      "size": [
+        0.75,
+        1.25,
+        0.9
+      ],
+      "color": [
+        0.58,
+        0.45,
+        0.23
+      ],
+      "name": "CRANE CONTROL STATION",
+      "description": "STATIONARY LIFTING GANTRY. CONTROLS AWAIT SERVICE.",
+      "solid": true
+    },
+    "crane_hook": {
+      "type": "scenery",
+      "position": [
+        324,
+        7,
+        3122
+      ],
+      "size": [
+        0.1,
+        4,
+        0.1
+      ],
+      "color": [
+        0.33,
+        0.35,
+        0.37
+      ]
+    },
+    "trolley": {
+      "type": "equipment",
+      "position": [
+        315,
+        0.76,
+        3110
+      ],
+      "size": [
+        3.65,
+        0.45,
+        6
+      ],
+      "color": [
+        0.34,
+        0.32,
+        0.24
+      ],
+      "name": "RECOVERY TROLLEY",
+      "description": "TOWABLE AIRCRAFT PLATFORM. CONDITION UNASSESSED.",
+      "solid": true
+    },
+    "trolley_wheel_313.4_3108": {
+      "type": "scenery",
+      "position": [
+        313.2,
+        0.28,
+        3108
+      ],
+      "size": [
+        0.65,
+        0.62,
+        0.65
+      ],
+      "color": [
+        0.13,
+        0.14,
+        0.15
+      ]
+    },
+    "trolley_wheel_313.4_3112": {
+      "type": "scenery",
+      "position": [
+        313.2,
+        0.28,
+        3112
+      ],
+      "size": [
+        0.65,
+        0.62,
+        0.65
+      ],
+      "color": [
+        0.13,
+        0.14,
+        0.15
+      ]
+    },
+    "trolley_wheel_316.6_3108": {
+      "type": "scenery",
+      "position": [
+        316.8,
+        0.28,
+        3108
+      ],
+      "size": [
+        0.65,
+        0.62,
+        0.65
+      ],
+      "color": [
+        0.13,
+        0.14,
+        0.15
+      ]
+    },
+    "trolley_wheel_316.6_3112": {
+      "type": "scenery",
+      "position": [
+        316.8,
+        0.28,
+        3112
+      ],
+      "size": [
+        0.65,
+        0.62,
+        0.65
+      ],
+      "color": [
+        0.13,
+        0.14,
+        0.15
+      ]
+    },
+    "trolley_support_-1": {
+      "type": "scenery",
+      "position": [
+        313.92,
+        1.08,
+        3110
+      ],
+      "size": [
+        0.34,
+        0.21,
+        5.1
+      ],
+      "color": [
+        0.55,
+        0.5,
+        0.37
+      ]
+    },
+    "trolley_support_1": {
+      "type": "scenery",
+      "position": [
+        316.08,
+        1.08,
+        3110
+      ],
+      "size": [
+        0.34,
+        0.21,
+        5.1
+      ],
+      "color": [
+        0.55,
+        0.5,
+        0.37
+      ]
+    },
+    "crane_hook_head": {
+      "type": "scenery",
+      "position": [
+        324,
+        5,
+        3122
+      ],
+      "size": [
+        0.42,
+        0.6,
+        0.33
+      ],
+      "color": [
+        0.33,
+        0.35,
+        0.37
+      ]
+    }
+  },
+  "anchors": {
+    "jeep_position": [
+      293,
+      0,
+      3115
+    ],
+    "tow_connection": [
+      311.5,
+      0.62,
+      3110
+    ],
+    "crane_attachment": [
+      324,
+      6,
+      3122
+    ],
+    "trolley_position": [
+      315,
+      0.65,
+      3110
+    ],
+    "future_aircraft_loading": [
+      318,
+      0,
+      3110
+    ],
+    "equipment_control_station": [
+      318,
+      1.1,
+      3122
+    ]
+  }
+}

@@ -86,6 +86,7 @@ class ModelNode:
                 interpolation.
         """
         self.name = name
+        self.extras = {}
         self.parent = None
         self.children = []
         self.meshes = tuple(meshes)
@@ -334,13 +335,27 @@ class ModelResources:
         Args:
             model: CPU model hierarchy and mesh data.
         """
-        from engine.mesh import Mesh
+        from engine.mesh import Mesh, upload_base_color
 
         self.meshes = []
+        self._textures = {}
+        self._textured_primitives = {}
         self._closed = False
         try:
-            for primitive in model.primitives:
-                colors = np.tile(primitive.material.base_color[:3], (len(primitive.positions), 1))
+            images = getattr(model, "base_color_textures", ())
+            for index, primitive in enumerate(model.primitives):
+                factor = primitive.material.base_color[:3]
+                image = images[index] if images else None
+                if image is None:
+                    colors = np.tile(factor, (len(primitive.positions), 1))
+                else:
+                    key = id(image)
+                    if key not in self._textures:
+                        self._textures[key] = upload_base_color(image)
+                    self._textured_primitives[index] = self._textures[key], factor
+                    colors = np.column_stack(
+                        (primitive.texcoords, np.zeros(len(primitive.positions)))
+                    )
                 self.meshes.append(
                     Mesh(np.column_stack((primitive.positions, colors)), primitive.indices)
                 )
@@ -348,12 +363,34 @@ class ModelResources:
             self.close()
             raise
 
-    def draw(self, model, shader, world=None):
+    def draw(self, model, shader, world=None, *, textured_shader=None):
         if self._closed:
             raise RuntimeError("Model GPU resources have been closed.")
+        if self._textures and textured_shader is None:
+            raise ValueError("Textured geometry requires a base-color shader")
+        if not self._textures:
+            for index, matrix in model.world_matrices(world):
+                shader.set_matrix("model", matrix)
+                self.meshes[index].draw()
+            return
+        from OpenGL import GL
+
+        active = shader
+        GL.glActiveTexture(GL.GL_TEXTURE0)
         for index, matrix in model.world_matrices(world):
-            shader.set_matrix("model", matrix)
+            texture = self._textured_primitives.get(index)
+            program = textured_shader if texture else shader
+            if program is not active:
+                program.use()
+                active = program
+            if texture:
+                handle, factor = texture
+                GL.glBindTexture(GL.GL_TEXTURE_2D, handle)
+                GL.glUniform3f(GL.glGetUniformLocation(program.program, "baseFactor"), *factor)
+            program.set_matrix("model", matrix)
             self.meshes[index].draw()
+        GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+        shader.use()
 
     def close(self):
         """Release owned resources."""
@@ -362,4 +399,10 @@ class ModelResources:
         for mesh in self.meshes:
             mesh.close()
         self.meshes.clear()
+        if self._textures:
+            from OpenGL import GL
+
+            GL.glDeleteTextures(list(self._textures.values()))
+            self._textures.clear()
+            self._textured_primitives.clear()
         self._closed = True

@@ -61,6 +61,16 @@ class CameraInput:
         Args:
             camera: Observational camera supplying view/projection matrices.
         """
+        if camera.mode in ("PILOT", "DRIVING"):
+            if self.reset_pressed:
+                camera.reset_orbit()
+            else:
+                camera.orbit_drag(*self.drag)
+                camera.orbit_zoom(self.scroll)
+            self.drag = (0.0, 0.0)
+            self.scroll = 0.0
+            self.reset_pressed = self.toggle_pressed = False
+            return
         if self.toggle_pressed:
             camera.toggle_external_mode()
             self.drag = (0.0, 0.0)

@@ -77,11 +77,16 @@ class FighterGroundContact:
             Whether all tested points lie on the runway.
         """
         from game.airfield_operations import GearState
-        from game.world_environment import RUNWAY
+
+        runway = getattr(getattr(self.environment, "environment", None), "runway", None)
+        if runway is None:
+            from game.world_environment import RUNWAY
+
+            runway = RUNWAY
 
         v = self.vehicle
         points = v.airfield.wheel_world(v) if v.airfield.gear is GearState.DEPLOYED else v.position
-        return bool(np.all(RUNWAY.contains(points)))
+        return bool(np.all(runway.contains(points)))
 
     def floor(self):
         """Query the minimum vehicle altitude that clears local wheel/body support.

@@ -107,3 +107,7 @@ project's MIT license; third-party dependencies retain their own licenses.
 For bug reports, include platform/interpreter versions, reproduction steps,
 expected and actual behavior, and relevant logs. Explain any checks you could not
 run and why.
+
+## Mission development records
+
+Update the [mission registry](lore/missions/REGISTRY.md) whenever a mission is proposed, implemented, modified, or verified. Record its dependencies and remaining work alongside the quest definition and narrative documents. Development status and per-save quest progress are tracked separately.

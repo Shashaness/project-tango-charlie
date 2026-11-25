@@ -1,15 +1,21 @@
 """Spatial test scenery and independent constant-velocity combat targets."""
 
+from math import atan2
+
 from game.ai_config import AI, AI_ENEMY_COUNT
 from game.enemy_aircraft import EnemyAircraft
 from game.flight_state import Environment
 from game.target import Target
+from game.world_loader import SceneRegistry, default_scene
+from game.world_manifest import WorldDefinition, load_manifest
 
 
 class World:
     """Own scenery, terrain support, targets, enemies, and shared countermeasure state."""
 
-    def __init__(self, enemy_count=AI_ENEMY_COUNT, ai_parameters=AI, terrain_config=None):
+    def __init__(
+        self, enemy_count=AI_ENEMY_COUNT, ai_parameters=AI, terrain_config=None, world_manifest=None
+    ):
         """Generate scenery/terrain, create targets, and spawn the configured enemies.
 
         Args:
@@ -17,20 +23,51 @@ class World:
             ai_parameters: Immutable AI tuning parameters.
             terrain_config: Optional terrain source/LOD configuration.
         """
-        from game.world_environment import WorldEnvironment
-
-        self.environment = WorldEnvironment()
-        from game.terrain import Terrain
-
-        self.terrain = Terrain(terrain_config, self.environment.protected_footprints)
+        from engine.jeep_asset import jeep_access_points
         from game.ground_environment import GroundEnvironment
+        from game.ground_vehicle import GroundVehicle
+        from game.terrain import Terrain
+        from game.world_environment import CITY_CENTER, WorldEnvironment
 
+        if world_manifest is None:
+            self.scene = default_scene()
+        else:
+            definition = (
+                world_manifest
+                if isinstance(world_manifest, WorldDefinition)
+                else load_manifest(world_manifest)
+            )
+            self.scene = SceneRegistry(definition)
+        self.aircraft_spawn = self.scene.of_kind("aircraft")[0]
+        self.pilot_spawn = self.scene.of_kind("character")[0]
+        self.environment = WorldEnvironment(scene=self.scene)
+        self.terrain = Terrain(
+            terrain_config or self.scene.definition.terrain, self.environment.protected_footprints
+        )
         self.ground = GroundEnvironment(self.environment, self.terrain)
-        from game.world_environment import CITY_CENTER, RUNWAY
+        self.environment.attach_access_roads(self.ground)
+        self.live_entities = {}
+        self.ground_vehicles = []
+        self.ground_vehicle_assets = {}
+        for placement in self.scene.of_kind("ground_vehicle"):
+            path = placement.definition.asset.path
+            fx, _, fz = placement.forward
+            vehicle = GroundVehicle(
+                placement.identity,
+                placement.position,
+                atan2(fx, fz),
+                anchors=jeep_access_points(path),
+            )
+            vehicle.place(self.ground)
+            vehicle.parking_brake = placement.definition.initial_state["parking_brake"]
+            self.ground_vehicles.append(vehicle)
+            self.ground_vehicle_assets[placement.identity] = path
+            self.live_entities[placement.identity] = vehicle
+        self.ground.mobile_obstacles = self.ground_vehicles
 
         self.geographic_anchors = dict(
             city=self.terrain.frame.from_local((CITY_CENTER[0], 0, CITY_CENTER[1])),
-            airport=self.terrain.frame.from_local(RUNWAY.center),
+            airport=self.terrain.frame.from_local(self.environment.runway.center),
         )
         self.targets = [
             Target(1, (0, 0, -1000)),

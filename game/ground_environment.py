@@ -63,6 +63,7 @@ class GroundEnvironment:
         self.heights = OrderedDict()
         self.cell_size = 128.0
         self.cells = {}
+        self.mobile_obstacles = ()
         self.boxes = [
             (np.asarray(center) - np.asarray(size) / 2, np.asarray(center) + np.asarray(size) / 2)
             for center, size in environment.solid_boxes
@@ -93,6 +94,9 @@ class GroundEnvironment:
         Returns:
             Whether the query lies in the flat compatibility region.
         """
+        for a, b, c, d in getattr(self.environment, "walkable_floors", ()):
+            if a <= x <= b and c <= z <= d:
+                return True
         for a, b, c, d in self.terrain.compatibility.footprints:
             dx = max(a - x, 0.0, x - b)
             dz = max(c - z, 0.0, z - d)
@@ -168,6 +172,8 @@ class GroundEnvironment:
             Surface kind string, defaulting to desert.
         """
         x, _, z = position
+        if any(road.contains(x, z) for road in getattr(self.environment, "access_roads", ())):
+            return "apron"
         for tile in reversed(self.environment.ground_surfaces):
             a, b, c, d = tile.bounds
             if a <= x <= b and c <= z <= d:
@@ -268,8 +274,9 @@ class GroundEnvironment:
         hi = np.maximum(previous, vehicle.position) + upper
         delta = vehicle.position - previous
         best = None
-        for index in self.candidates(lo, hi):
-            boxlo, boxhi = self.boxes[index]
+        static = [self.boxes[index] for index in self.candidates(lo, hi)]
+        moving = [entity.bounds() for entity in self.mobile_obstacles if entity is not vehicle]
+        for boxlo, boxhi in (*static, *moving):
             # Expand the obstacle by the oriented hull extents (Minkowski difference),
             # reducing swept hull contact to a segment-versus-box slab intersection.
             a, b = boxlo - upper, boxhi - lower

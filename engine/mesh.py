@@ -6,6 +6,27 @@ import numpy as np
 from OpenGL import GL
 
 
+def upload_base_color(pixels):
+    """Upload one embedded RGBA base-color image in the current context."""
+    texture = GL.glGenTextures(1)
+    try:
+        GL.glBindTexture(GL.GL_TEXTURE_2D, texture)
+        height, width = pixels.shape[:2]
+        GL.glTexImage2D(
+            GL.GL_TEXTURE_2D, 0, GL.GL_RGBA8, width, height, 0,
+            GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, pixels,
+        )
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR_MIPMAP_LINEAR)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
+        GL.glGenerateMipmap(GL.GL_TEXTURE_2D)
+    except Exception:
+        GL.glDeleteTextures([texture])
+        raise
+    finally:
+        GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+    return texture
+
+
 class Mesh:
     """Own a VAO and buffers for interleaved position/color triangle geometry."""
 
@@ -54,6 +75,15 @@ class Mesh:
             # The EBO binding is stored in the VAO; leave it attached.
             GL.glBindVertexArray(0)
             GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
+
+    def update_vertices(self, vertices):
+        """Replace interleaved vertices while retaining the VAO and index buffer."""
+        vertices = np.ascontiguousarray(vertices, dtype=np.float32)
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self.vbo)
+        GL.glBufferData(GL.GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL.GL_STREAM_DRAW)
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
+        if not self.ebo:
+            self.count = len(vertices)
 
     def draw(self):
         """Draw the uploaded triangle mesh with the current OpenGL context."""

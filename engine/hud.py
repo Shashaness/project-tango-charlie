@@ -1,6 +1,7 @@
 """Read-only flight instruments drawn in framebuffer pixels with core OpenGL."""
 
 import math
+from textwrap import wrap
 
 import numpy as np
 from OpenGL import GL
@@ -835,6 +836,225 @@ class HUD:
         if self.width <= 0 or self.height <= 0:
             return
         vertices = self.geometry(vehicle, camera, fcc, debug, combat)
+        self.draw_overlay(vertices, shader)
+
+    def render_control_prompt(self, shader, label, *, row_offset=0):
+        """Draw the current interaction or driving status."""
+        if self.width <= 0 or self.height <= 0 or not label:
+            return
+        scale = min(3.0, self.width / 420, self.height / 260)
+        vertices = []
+        top = self.height - (24 + row_offset * 9) * scale
+        self._bitmap_text(vertices, label, 8 * scale, top, scale, HUD_COLOR)
+        self.draw_overlay(np.asarray(vertices, dtype=np.float32), shader)
+
+    @staticmethod
+    def _bitmap_text(vertices, label, left, top, scale, color):
+        for column, character in enumerate(label.upper()):
+            for row, line in enumerate(FONT.get(character, FONT[" "]).split("/")):
+                for index, bit in enumerate(line):
+                    if bit != "1":
+                        continue
+                    x = left + (column * 4 + index) * scale
+                    y = top - (row + 1) * scale
+                    HUD._rectangle(vertices, x, y, scale, scale, color)
+
+    @staticmethod
+    def _rectangle(vertices, x, y, width, height, color):
+        vertices.extend(
+            (x + dx * width, y + dy * height, 0, *color)
+            for dx, dy in ((0, 0), (1, 0), (1, 1), (0, 0), (1, 1), (0, 1))
+        )
+
+    def render_navigation(self, shader, fix, notice):
+        """Draw the helmet band and return the number of prompt rows reserved."""
+        from game.navigation import tape
+
+        if self.width <= 0 or self.height <= 0:
+            return 0
+        scale = min(3.0, self.width / 420, self.height / 260)
+        width, top = self.width, self.height
+        color = (0.68, 0.96, 0.85)
+        panel = []
+        self._rectangle(panel, 0, top - 49 * scale, width, 49 * scale, (0.04, 0.09, 0.10))
+        self.draw_glass(panel, shader)
+        vertices = []
+
+        def put(label, x, row, align=0, size=1):
+            step = scale * size
+            self._bitmap_text(
+                vertices,
+                label,
+                x - align * len(label) * 4 * step,
+                top - row * scale,
+                step,
+                color,
+            )
+
+        center = width / 2
+        put("TERRESTRIAL NAVIGATION", 8 * scale, 5)
+        put("NAV ONLINE", width - 8 * scale, 5, 1)
+        x, y, z = fix.position
+        put(f"X {x:+.3f} M", 8 * scale, 30)
+        put(f"Z {z:+.3f} M", 8 * scale, 38)
+        put(f"Y {y:+.3f} M", width - 8 * scale, 30, 1)
+        put(f"REF {fix.reference}", width - 8 * scale, 38, 1)
+        if fix.heading is not None:
+            for offset, label in tape(fix.heading):
+                location = center + offset * width * 0.00375
+                self._rectangle(
+                    vertices,
+                    location,
+                    top - 25 * scale,
+                    scale * 0.45,
+                    scale * (4 if label else 2),
+                    color,
+                )
+                if label:
+                    put(label, location, 12, 0.5)
+        vertices.extend(
+            (
+                (center, top - 26 * scale, 0, *color),
+                (center - 2 * scale, top - 29 * scale, 0, *color),
+                (center + 2 * scale, top - 29 * scale, 0, *color),
+            )
+        )
+        numeric = "---" if fix.heading is None else f"{round(fix.heading, 1) % 360:05.1f}°"
+        put(numeric, center, 31, 0.5, 1.3)
+        if notice:
+            put(notice, center, 41, 0.5)
+        self.draw_overlay(np.asarray(vertices, dtype=np.float32), shader)
+        return 4
+
+    def draw_glass(self, vertices, shader, alpha=0.68):
+        was_enabled = GL.glIsEnabled(GL.GL_BLEND)
+        previous = GL.glGetFloatv(GL.GL_BLEND_COLOR)
+        factors = tuple(
+            GL.glGetIntegerv(mode)
+            for mode in (
+                GL.GL_BLEND_SRC_RGB,
+                GL.GL_BLEND_DST_RGB,
+                GL.GL_BLEND_SRC_ALPHA,
+                GL.GL_BLEND_DST_ALPHA,
+            )
+        )
+        try:
+            GL.glEnable(GL.GL_BLEND)
+            GL.glBlendColor(0, 0, 0, alpha)
+            GL.glBlendFunc(GL.GL_CONSTANT_ALPHA, GL.GL_ONE_MINUS_CONSTANT_ALPHA)
+            self.draw_overlay(np.asarray(vertices, dtype=np.float32), shader)
+        finally:
+            GL.glBlendColor(*previous)
+            GL.glBlendFuncSeparate(*factors)
+            if not was_enabled:
+                GL.glDisable(GL.GL_BLEND)
+
+    def render_helmet_information(self, shader, content, page, banner, context=None):
+        from engine.helmet_information import TABS, paginate
+
+        if self.width <= 0 or self.height <= 0:
+            return
+        scale = min(3.0, self.width / 420, self.height / 260)
+        edge = 7 * scale
+        width = min(self.width - 2 * edge, 185 * scale)
+        columns = max(1, int((width - 2 * edge) / (4 * scale)))
+        rows = max(1, min(10, int((self.height * 0.47 / scale - 30) / 8)))
+        tab, labels = content
+        visible, index, pages = paginate(labels, columns, rows, page)
+        height = (30 + len(visible) * 8) * scale
+        x, y = edge, edge
+        top = y + height
+        color = (0.68, 0.96, 0.85)
+        muted = (0.50, 0.73, 0.69)
+        background = []
+        self._rectangle(background, x, y, width, height, (0.04, 0.09, 0.10))
+        if tab in TABS:
+            third = width / len(TABS)
+            self._rectangle(
+                background,
+                x + third * TABS.index(tab),
+                top - 13 * scale,
+                third,
+                13 * scale,
+                (0.13, 0.26, 0.25),
+            )
+        self.draw_glass(background, shader)
+        vertices = []
+        self._rectangle(vertices, x, top - 14 * scale, width, 0.4 * scale, muted)
+        if tab == "JOURNAL":
+            self._bitmap_text(vertices, tab, x + edge, top - 4 * scale, scale, color)
+        else:
+            for i, label in enumerate(TABS):
+                self._bitmap_text(
+                    vertices,
+                    label,
+                    x + (i + 0.5) * third - len(label) * 2 * scale,
+                    top - 4 * scale,
+                    scale,
+                    color if label == tab else muted,
+                )
+        for i, label in enumerate(visible):
+            self._bitmap_text(
+                vertices,
+                label,
+                x + edge,
+                top - (18 + 8 * i) * scale,
+                scale,
+                muted if label.startswith("DONE /") else color,
+            )
+        footer = "[F7] TABS" if tab != "JOURNAL" else ""
+        if pages > 1:
+            footer += f"  PGUP/PGDN {index}/{pages}"
+        self._bitmap_text(vertices, footer, x + edge, y + 8 * scale, scale, muted)
+        self.draw_overlay(np.asarray(vertices, dtype=np.float32), shader)
+        notification_top = self.height - 55 * scale
+        center_left = (self.width - width) / 2
+        context_top = notification_top
+        palette = (color, muted)
+        if banner:
+            bottom = self.draw_helmet_notification(
+                shader, banner, center_left, notification_top, width, scale, columns, palette
+            )
+            if x + width + edge > center_left:
+                context_top = bottom - edge
+        if context:
+            self.draw_helmet_notification(
+                shader, context, x, context_top, width, scale, columns, palette,
+                floor=top + edge,
+            )
+
+    def draw_helmet_notification(
+        self, shader, card, left, top, width, scale, columns, palette, *, floor=0
+    ):
+        title, label, opacity = card
+        color, muted = palette
+        labels = [
+            line for paragraph in label.splitlines() for line in wrap(paragraph, width=columns)
+        ]
+        rows = int(((top - floor) / scale - 15) // 8)
+        if rows < 1 or opacity <= 0:
+            return top
+        if len(labels) > rows:
+            labels = labels[:rows]
+            labels[-1] = labels[-1][: columns - 3].rstrip() + "..."
+        height = (15 + len(labels) * 8) * scale
+        bottom = top - height
+        bg, text = [], []
+        self._rectangle(bg, left, bottom, width, height, (0.04, 0.09, 0.10))
+        self._rectangle(text, left, top - 0.5 * scale, width, 0.5 * scale, color)
+        padding = 7 * scale
+        heading, _, counter = title.partition("\t")
+        self._bitmap_text(text, heading, left + padding, top - 5 * scale, scale, muted)
+        if counter:
+            right = left + width - padding - len(counter) * 4 * scale
+            self._bitmap_text(text, counter, right, top - 5 * scale, scale, muted)
+        for i, line in enumerate(labels):
+            self._bitmap_text(text, line, left + padding, top - (13 + i * 8) * scale, scale, color)
+        self.draw_glass(bg, shader, 0.68 * opacity)
+        self.draw_glass(text, shader, opacity)
+        return bottom
+
+    def draw_overlay(self, vertices, shader):
         projection = np.eye(4, dtype=np.float32)
         projection[0, 0], projection[1, 1] = 2 / self.width, 2 / self.height
         projection[0, 3] = projection[1, 3] = -1

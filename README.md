@@ -40,11 +40,28 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-M20 starts TC167 at rest on runway 36 in ATMOSPHERE/FIGHTER, facing the
-procedural city skyline. Hold Up to accelerate, then use a small S pitch input
-near 85–100 m/s to rotate. F4 resets to the runway from any configuration;
-F1/F2 retain SPACE and airborne atmospheric test resets. Buildings are scenery
-and do not collide. See [world layout, runway support and testing](docs/WORLD_ENVIRONMENT.md).
+TC167 starts parked in the mechanics hangar in ATMOSPHERE/FIGHTER. Press
+**Enter** to exit, then use **WASD** to walk, **Shift** to run, and **Space**
+to jump. Drag to orbit and scroll to switch smoothly between third-person
+and eye-level views. Press **Enter** near the parked TC167 to board. See
+[on-foot controls and pilot authoring](docs/M22_ON_FOOT.md).
+
+Walk to the Jeep and press **Enter** to board. Release the parking brake
+with **P**, steer and drive with **WASD**, and brake with **Space** before
+exiting. See [ground vehicle controls and asset workflow](docs/M23_GROUND_VEHICLE.md).
+
+Edit the pilot and Jeep in their standalone Blender sources. See the
+[Blender asset authoring and export workflow](docs/M23_2_BLENDER_ASSET_AUTHORING.md).
+
+The [world manifest](assets/worlds/tango_charlie/world.json) defines initial
+placements, terrain and airport settings. Use `--world-manifest` to load
+an alternate definition. See the [world architecture and environmental
+asset guide](docs/M24_WORLD_ARCHITECTURE.md) for the hangar and repair station
+Blender sources, collision markers, and export commands.
+
+**F4** resets to runway 36. Hold Up to accelerate, then use a small S pitch
+input near 85–100 m/s to rotate. F1/F2 retain the SPACE and airborne
+atmospheric test resets. See [world layout, runway support and testing](docs/WORLD_ENVIRONMENT.md).
 
 On Windows, activate with `.venv\Scripts\activate` instead. An existing environment
 can be activated directly. A display and OpenGL 3.3 Core graphics driver are required.
@@ -1624,3 +1641,20 @@ no longer causes a crash. Static walls/buildings and severe terrain/contact
 conditions do. **F4** retains the direct runway reset. See
 [GROUND_OPERATIONS.md](docs/GROUND_OPERATIONS.md) for controls, parameters,
 collision limits, and the complete taxi/takeoff/landing/hangar procedure.
+
+### Arrival campaign preview
+
+Run `python main.py --campaign` to start or resume Arrival and play Q001. The default startup and `python main.py --sandbox` open the existing sandbox. Use `--campaign --new-campaign` to explicitly replace the selected campaign save. See [Arrival campaign guide](docs/Q1_CAMPAIGN.md) for save options and the quest framework.
+
+### M25.1.1 vehicle authoring checkpoint
+
+Arrival includes the textured white Jeep and the production female pilot. The
+curated authoring files and runtime GLBs ship with the project. Raw imports
+under `assets/source/` and local Blender backups are kept outside Git. The game
+uses the curated GLBs. Authoring can continue from the committed Blender files,
+and a fresh import from raw geometry requires the separately retained source.
+
+PTC Vehicle SDK **1.0.1** supports Blender 5.0.1 sidebar drawing, explicit
+vehicle-root selection, and export of hidden mechanical nodes with authoring
+state restored. The asset contract remains v1. See the [vehicle authoring
+guide](docs/M25_1_VEHICLE_AUTHORING_SDK.md).

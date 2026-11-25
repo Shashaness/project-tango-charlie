@@ -9,11 +9,18 @@ class Input:
     def __init__(self):
         """Initialize held-key history and normalized pilot command fields."""
         self.space_pressed = self.atmosphere_pressed = self.reset_pressed = False
-        self.runway_pressed = False
+        self.runway_pressed = self.survey_pressed = False
+        self.helmet_tab_pressed = self.helmet_page_up = self.helmet_page_down = False
         self._debug_down = set()
         self.dispense_flare = self.dispense_chaff = self.toggle_ecm = False
         self.select_radar = self.select_ir = False
         self.jump_pressed = False
+        self.interact_pressed = self.pilot_jump = self.pilot_run = False
+        self.toggle_parking_brake = False
+        self.inspect_pressed = self.journal_pressed = self.hint_pressed = False
+        self.journal_next_pressed = self.object_next_pressed = False
+        self.pilot_advance = self.pilot_strafe = 0
+        self._pilot_space_down = False
         self.launch_missile = False
         self.select_target = False
         self.fire_gun = False
@@ -50,6 +57,14 @@ class Input:
         if glfw.get_key(window, glfw.KEY_ESCAPE) == glfw.PRESS:
             glfw.set_window_should_close(window, True)
         self.fire_gun = glfw.get_key(window, glfw.KEY_SPACE) == glfw.PRESS
+        self.pilot_jump = self.fire_gun and not self._pilot_space_down
+        self._pilot_space_down = self.fire_gun
+        self.pilot_advance = axis(glfw.KEY_W, glfw.KEY_S)
+        self.pilot_strafe = axis(glfw.KEY_D, glfw.KEY_A)
+        self.pilot_run = any(
+            glfw.get_key(window, key) == glfw.PRESS
+            for key in (glfw.KEY_LEFT_SHIFT, glfw.KEY_RIGHT_SHIFT)
+        )
         self.vector_command = axis(glfw.KEY_X, glfw.KEY_Z)
         self.brake = glfw.get_key(window, glfw.KEY_X) == glfw.PRESS
         self.wheel_brake = glfw.get_key(window, glfw.KEY_6) == glfw.PRESS
@@ -67,7 +82,18 @@ class Input:
         debug_keys = {
             key
             for key in (
+                glfw.KEY_ENTER,
+                glfw.KEY_T,
+                glfw.KEY_I,
+                glfw.KEY_O,
+                glfw.KEY_U,
+                glfw.KEY_N,
+                glfw.KEY_P,
                 glfw.KEY_F4,
+                glfw.KEY_F6,
+                glfw.KEY_F7,
+                glfw.KEY_PAGE_UP,
+                glfw.KEY_PAGE_DOWN,
                 glfw.KEY_F1,
                 glfw.KEY_F2,
                 glfw.KEY_R,
@@ -97,6 +123,17 @@ class Input:
         self.select_target = glfw.KEY_TAB in debug_keys - self._debug_down
         self.launch_missile = glfw.KEY_M in debug_keys - self._debug_down
         edges = debug_keys - self._debug_down
+        self.interact_pressed = glfw.KEY_ENTER in edges
+        self.survey_pressed = glfw.KEY_F6 in edges
+        self.helmet_tab_pressed = glfw.KEY_F7 in edges
+        self.helmet_page_up = glfw.KEY_PAGE_UP in edges
+        self.helmet_page_down = glfw.KEY_PAGE_DOWN in edges
+        self.inspect_pressed = glfw.KEY_T in edges
+        self.journal_pressed = glfw.KEY_I in edges
+        self.hint_pressed = glfw.KEY_U in edges
+        self.journal_next_pressed = glfw.KEY_N in edges
+        self.object_next_pressed = glfw.KEY_O in edges
+        self.toggle_parking_brake = glfw.KEY_P in edges
         self.toggle_flaps = glfw.KEY_7 in edges
         self.toggle_gear = glfw.KEY_8 in edges
         self.jump_pressed = glfw.KEY_K in edges
