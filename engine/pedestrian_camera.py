@@ -14,6 +14,7 @@ class PedestrianCamera(Camera):
     def __init__(self):
         super().__init__()
         self.mode = "PILOT"
+        self._heading = 0.0
         self.reset_orbit()
 
     @property
@@ -31,7 +32,7 @@ class PedestrianCamera(Camera):
 
     def begin(self, pilot):
         self.reset_orbit()
-        self.orbit_yaw = math.atan2(pilot.forward[0], pilot.forward[2])
+        self._heading = pilot.heading
 
     def orbit_drag(self, dx, dy):
         self.orbit_yaw -= dx * ORBIT_SENSITIVITY
@@ -49,9 +50,11 @@ class PedestrianCamera(Camera):
         )
 
     def look_direction(self):
-        return np.array((math.sin(self.orbit_yaw), 0, math.cos(self.orbit_yaw)))
+        yaw = self._heading + self.orbit_yaw
+        return np.array((math.sin(yaw), 0, math.cos(yaw)))
 
     def observe(self, pilot, space, dt):
+        self._heading = pilot.heading
         horizontal = self.look_direction()
         self.forward = horizontal * math.cos(self.orbit_pitch) + UP * math.sin(self.orbit_pitch)
         self.right = np.cross(horizontal, UP)

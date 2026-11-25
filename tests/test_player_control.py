@@ -1,5 +1,6 @@
 """Acceptance coverage for the parked TC167 and on-foot world lifecycle."""
 
+import math
 import unittest
 from types import SimpleNamespace
 
@@ -12,7 +13,14 @@ from engine.pedestrian_camera import PedestrianCamera
 from engine.pilot_asset import PilotAsset
 from game.flight_state import Environment, FlightStatus, VehicleMode
 from game.ground_environment import GroundEnvironment
-from game.player_control import EYE_HEIGHT, RADIUS, ControlMode, PedestrianSpace, Pilot
+from game.player_control import (
+    EYE_HEIGHT,
+    PILOT_TURN_RATE,
+    RADIUS,
+    ControlMode,
+    PedestrianSpace,
+    Pilot,
+)
 
 ZERO = np.zeros(3)
 WEST = np.array((-1.0, 0.0, 0.0))
@@ -156,10 +164,11 @@ class PlayerControlTests(unittest.TestCase):
         direction = center - start
         direction[1] = 0
         direction /= np.linalg.norm(direction)
-        pilot.update(2, self.control.space, direction, run=True)
+        pilot.forward[:] = direction
+        pilot.update(2, self.control.space, 1, run=True)
         self.assertGreater(np.linalg.norm(pilot.position - center), 5)
         self.assertFalse(self.control.space.blocked(pilot.position))
-        pilot.update(12, self.control.space, -direction, run=True)
+        pilot.update(12, self.control.space, -1, run=True)
         self.assertLess(abs(pilot.position[2] - 3000), 54 - RADIUS)
         self.assertFalse(self.control.space.blocked(pilot.position))
         self.assertAlmostEqual(pilot.position[1], 0)
@@ -168,27 +177,27 @@ class PlayerControlTests(unittest.TestCase):
         ground = ground_with(self.game.world.ground, [((2.0, 0.10, 2900), (1.0, 0.2, 2))])
         space = PedestrianSpace(ground, self.vehicle)
         pilot = Pilot((0, 0, 2900), EAST)
-        pilot.update(0.65, space, EAST)
+        pilot.update(0.65, space, 1)
         self.assertGreater(pilot.position[0], 1.5)
         self.assertAlmostEqual(pilot.position[1], 0.2)
-        pilot.update(0.22, space, ZERO, jump=True)
+        pilot.update(0.22, space, 0, jump=True)
         self.assertGreater(pilot.position[1], 0.8)
         self.assertFalse(pilot.grounded)
-        pilot.update(1.1, space, ZERO)
+        pilot.update(1.1, space, 0)
         self.assertTrue(pilot.grounded)
         self.assertAlmostEqual(pilot.position[1], 0.2)
 
         ground.height = lambda p: p[0] * 2.2
         ground.normal = lambda _: np.array((-0.91, 0.41, 0))
         steep = Pilot((0, 0.36, 2900), EAST)
-        steep.update(1, space, EAST)
+        steep.update(1, space, 1)
         self.assertLess(steep.position[0], 0.1)
         ground.height = lambda p: p[0] * 0.35
         ground.normal = lambda _: np.array((-0.33, 0.94, 0))
         for dt, count in ((1 / 30, 60), (1 / 144, 288)):
             current = Pilot((-5, -1.75, 2910), EAST)
             for _ in range(count):
-                current.update(dt, space, EAST, run=True)
+                current.update(dt, space, 1, run=True)
             self.assertAlmostEqual(current.position[1], ground.height(current.position), places=2)
             if count == 60:
                 baseline = current.position.copy()
@@ -213,7 +222,7 @@ class PlayerControlTests(unittest.TestCase):
         camera.orbit_zoom(-50)
         camera.observe(pilot, space, 1)
         self.assertFalse(camera.first_person)
-        camera.orbit_yaw = np.pi / 2
+        camera.orbit_yaw = np.pi / 2 - pilot.heading
         pilot.position[:] = (292, 0, 2980)
         ground = ground_with(
             self.game.world.ground,
@@ -263,15 +272,9 @@ class PlayerControlTests(unittest.TestCase):
             game.input.pilot_advance = 0
             game.input.pilot_run = False
 
-    def test_wasd_uses_avatar_heading_at_all_camera_quarter_turns(self):
+    def test_forward_and_reverse_uses_avatar_heading_at_all_camera_quarter_turns(self):
         game = self.game
-        cases = (
-            ((0, 1), WEST),
-            ((0, -1), EAST),
-            ((1, 0), (0, 0, -1)),
-            ((-1, 0), (0, 0, 1)),
-            ((1, 1), (-1 / np.sqrt(2), 0, -1 / np.sqrt(2))),
-        )
+        cases = (((0, 1), WEST), ((0, -1), EAST))
         try:
             for offset in np.arange(4) * np.pi / 2:
                 for keys, expected in cases:
@@ -286,7 +289,7 @@ class PlayerControlTests(unittest.TestCase):
                         np.testing.assert_allclose(
                             delta / np.linalg.norm(delta), expected, atol=1e-10
                         )
-                        np.testing.assert_allclose(pilot.forward, expected, atol=1e-10)
+                        np.testing.assert_array_equal(pilot.forward, WEST)
         finally:
             game.input.pilot_strafe = game.input.pilot_advance = 0
 
@@ -304,6 +307,78 @@ class PlayerControlTests(unittest.TestCase):
         np.testing.assert_array_equal(pilot.forward, WEST)
         np.testing.assert_array_equal(pilot.velocity, ZERO)
         self.assertEqual(pilot.clip, "Idle")
+
+    def test_stationary_turns_cross_heading_wrap_and_keep_camera_offset(self):
+        game = self.game
+        camera = game.pedestrian_camera
+        game.input.pilot_advance = 0
+        try:
+            for steer in (-1, 1):
+                pilot = self.on_foot_trial((0, 0, -1))
+                start = pilot.position.copy()
+                camera.orbit_yaw = math.pi
+                game.input.pilot_strafe = steer
+                previous = pilot.heading
+                for _ in range(10):
+                    game.update(1 / 60)
+                    delta = math.remainder(pilot.heading - previous, math.tau)
+                    self.assertAlmostEqual(delta, -steer * PILOT_TURN_RATE / 60)
+                    np.testing.assert_allclose(camera.look_direction(), -pilot.forward, atol=1e-12)
+                    previous = pilot.heading
+                np.testing.assert_array_equal(pilot.position, start)
+                self.assertEqual(pilot.clip, "Turn")
+                game.input.pilot_strafe = 0
+                game.update(1 / 60)
+                self.assertEqual(pilot.clip, "Idle")
+        finally:
+            game.input.pilot_strafe = 0
+
+    def test_moving_turns_follow_same_arc_with_mouse_orbit_then_release_straight(self):
+        game = self.game
+        camera = game.pedestrian_camera
+        try:
+            for steering, running, clip in ((-1, False, "Walk"), (1, True, "Run")):
+                paths = []
+                for orbit in (False, True):
+                    pilot = self.on_foot_trial()
+                    camera.orbit_yaw = math.pi / 2
+                    game.input.pilot_advance = 1
+                    game.input.pilot_strafe = steering
+                    game.input.pilot_run = running
+                    path = []
+                    for _ in range(45):
+                        if orbit:
+                            game.camera_input.drag = (18, 1)
+                        game.update(1 / 60)
+                        path.append(np.r_[pilot.position, pilot.velocity, pilot.forward])
+                        view = pilot.heading + camera.orbit_yaw
+                        np.testing.assert_allclose(
+                            camera.look_direction(), (math.sin(view), 0, math.cos(view))
+                        )
+                    paths.append(path)
+                    self.assertEqual(pilot.clip, clip)
+                    self.assertAlmostEqual(pilot.heading, -steering * math.pi / 2)
+                    self.assertGreater(-steering * (pilot.position[0] - 1000), 0.5)
+                    game.input.pilot_strafe = 0
+                    start, forward = pilot.position.copy(), pilot.forward.copy()
+                    game.update(1 / 3)
+                    np.testing.assert_array_equal(pilot.forward, forward)
+                    delta = pilot.position - start
+                    np.testing.assert_allclose(delta / np.linalg.norm(delta), forward, atol=1e-10)
+                np.testing.assert_array_equal(*paths)
+        finally:
+            game.input.pilot_strafe = game.input.pilot_advance = 0
+            game.input.pilot_run = False
+
+    def test_longitudinal_steering_is_independent_of_frame_rate(self):
+        traces = []
+        for frames in (30, 60, 144):
+            pilot = self.on_foot_trial()
+            for _ in range(frames):
+                pilot.update(1 / frames, self.control.space, 1, run=True, steer=1)
+            traces.append(np.r_[pilot.position, pilot.velocity, pilot.forward])
+        for trace in traces[1:]:
+            np.testing.assert_allclose(trace, traces[0], atol=1e-10)
 
     def test_original_skinned_pilot_animates(self):
         asset = PilotAsset(asset_path("models/characters/pilot.glb"))

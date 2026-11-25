@@ -12,6 +12,7 @@ HEIGHT = 1.80
 EYE_HEIGHT = 1.63
 STEP_HEIGHT = 0.32
 WALKABLE_Y = math.cos(math.radians(46))
+PILOT_TURN_RATE = math.radians(120)
 UP = np.array((0.0, 1.0, 0.0))
 
 
@@ -119,31 +120,30 @@ class Pilot:
         self.elapsed = 0.0
         self._accumulator = 0.0
         self._jump = False
-        self._movement_input = None
-        self._movement_direction = np.zeros(3)
 
-    def movement_direction(self, strafe, advance):
-        keys = (strafe, advance)
-        if keys != self._movement_input:
-            # Hold the requested direction as the pilot turns to face it.
-            direction = self.forward * advance + np.cross(self.forward, UP) * strafe
-            self._movement_direction = direction / max(1, np.linalg.norm(direction))
-            self._movement_input = keys
-        return self._movement_direction
+    @property
+    def heading(self):
+        return math.atan2(self.forward[0], self.forward[2])
 
-    def update(self, dt, space, direction, run=False, jump=False):
+    def update(self, dt, space, advance, run=False, jump=False, *, steer=0):
         self._jump |= jump
         self._accumulator += max(dt, 0.0)
         step = 1 / 120
         while self._accumulator + 1e-10 >= step:
-            self._step(step, space, direction, run, self._jump)
+            self._step(step, space, advance, run, self._jump, steer)
             self._jump = False
             self._accumulator -= step
 
-    def _step(self, dt, space, direction, run, jump):
-        desired = direction * (6 if run else 3)
+    def _step(self, dt, space, advance, run, jump, steer):
         horizontal = (0, 2)
-        self.velocity[[0, 2]] += (desired[[0, 2]] - self.velocity[[0, 2]]) * (-math.expm1(-18 * dt))
+        speed = float(self.velocity @ self.forward)
+        if steer:
+            # +Z forward has its right side along -X, as in Jeep steering.
+            heading = self.heading - steer * PILOT_TURN_RATE * dt
+            self.forward[:] = (math.sin(heading), 0, math.cos(heading))
+        target_speed = advance * (6 if run else 3)
+        speed += (target_speed - speed) * (-math.expm1(-18 * dt))
+        self.velocity[[0, 2]] = speed * self.forward[[0, 2]]
         if jump and self.grounded:
             self.velocity[1] = 5.2
             self.grounded = False
@@ -185,15 +185,7 @@ class Pilot:
         moved = self.position - before
         moved[1] = 0
         speed = np.linalg.norm(moved) / dt
-        turn = False
-        if np.linalg.norm(direction) > 1e-4:
-            yaw = math.atan2(self.forward[0], self.forward[2])
-            target = math.atan2(direction[0], direction[2])
-            angle = math.remainder(target - yaw, math.tau)
-            yaw += np.clip(angle, -9 * dt, 9 * dt)
-            self.forward[:] = (math.sin(yaw), 0, math.cos(yaw))
-            turn = abs(angle) > 0.2
-        clip = "Run" if speed > 3.5 else "Walk" if speed > 0.15 else "Turn" if turn else "Idle"
+        clip = "Run" if speed > 3.5 else "Walk" if speed > 0.15 else "Turn" if steer else "Idle"
         self.elapsed += dt
         self.clip = clip
 

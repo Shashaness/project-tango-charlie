@@ -529,18 +529,14 @@ class Game:
             self.camera_input.apply(camera)
         if on_foot:
             pilot = controls.pilot
-            if switched:
-                pilot.movement_direction(0, 0)
-            else:
-                direction = pilot.movement_direction(
-                    self.input.pilot_strafe, self.input.pilot_advance
-                )
+            if not switched:
                 pilot.update(
                     dt,
                     controls.space,
-                    direction * movement_scale,
+                    self.input.pilot_advance * movement_scale,
                     self.input.pilot_run and movement_scale == 1,
                     self.input.pilot_jump and movement_scale == 1,
+                    steer=self.input.pilot_strafe,
                 )
             camera.observe(pilot, controls.space, dt)
         elif driving:

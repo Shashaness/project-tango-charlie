@@ -153,7 +153,6 @@ class OccupancyTests(unittest.TestCase):
         if np.linalg.norm(heading) < 0.35:
             return
         pilot.forward[:] = heading / np.linalg.norm(heading)
-        pilot.movement_direction(0, 0)
         self.game.input.pilot_advance = 1
         self.game.input.pilot_run = True
         for _ in range(limit):
